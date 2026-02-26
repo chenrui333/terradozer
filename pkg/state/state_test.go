@@ -1,6 +1,8 @@
 package state_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -104,6 +106,29 @@ func TestState_ProviderNames(t *testing.T) {
 
 			assert.Equal(t, tc.expectedProviderNames, actualProviderNames)
 		})
+	}
+}
+
+func TestNewState_SupportsTFStateAndJSONExtensions(t *testing.T) {
+	stateData, err := os.ReadFile("../../test/test-fixtures/tfstates/version4-tf19-provider.json")
+	require.NoError(t, err)
+
+	tmpDir := t.TempDir()
+
+	paths := []string{
+		filepath.Join(tmpDir, "state.tfstate"),
+		filepath.Join(tmpDir, "state.json"),
+		filepath.Join(tmpDir, "state.tfstate.json"),
+	}
+
+	for _, path := range paths {
+		err = os.WriteFile(path, stateData, 0o644)
+		require.NoError(t, err)
+
+		actualState, newStateErr := state.New(path)
+		require.NoError(t, newStateErr)
+		require.NotNil(t, actualState)
+		assert.Equal(t, []string{"aws"}, actualState.ProviderNames())
 	}
 }
 
