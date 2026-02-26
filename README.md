@@ -51,6 +51,24 @@ Supported release targets:
 - `os`: `darwin`, `linux`
 - `arch`: `amd64`, `arm64`
 
+### Verify Release Provenance
+
+Release assets are published with GitHub Artifact Attestations. To verify a downloaded
+asset and checksums file (example: `v0.1.2`):
+
+```bash
+VERSION=v0.1.2
+ASSET="terradozer_${VERSION}_linux_amd64.tar.gz"
+CHECKSUMS="terradozer_${VERSION}_checksums.txt"
+
+gh release download "$VERSION" --repo chenrui333/terradozer --pattern "$ASSET" --pattern "$CHECKSUMS"
+
+gh attestation verify "$ASSET" --repo chenrui333/terradozer
+gh attestation verify "$CHECKSUMS" --repo chenrui333/terradozer
+
+grep " $ASSET$" "$CHECKSUMS" | shasum -a 256 -c -
+```
+
 Here is the recommended way to install a specific version (example: `v0.1.2`):
 
 ```bash
