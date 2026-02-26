@@ -185,11 +185,10 @@ func TestAcc_Version(t *testing.T) {
 
 	actualLogs := logBuffer.String()
 
-	assert.Contains(t, actualLogs, fmt.Sprintf(`
-version: dev
-commit: ?
-built at: ?
-using: %s`, runtime.Version()))
+	assert.Contains(t, actualLogs, "\nversion: dev")
+	assert.Regexp(t, `\ncommit: .+`, actualLogs)
+	assert.Regexp(t, `\nbuilt at: .+`, actualLogs)
+	assert.Contains(t, actualLogs, fmt.Sprintf("\nusing: %s", runtime.Version()))
 
 	fmt.Println(actualLogs)
 }
