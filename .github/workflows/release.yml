@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: write
+  attestations: write
+  id-token: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -38,3 +40,10 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Attest release artifacts
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/terradozer_*_*_*.tar.gz
+            dist/terradozer_*_checksums.txt
