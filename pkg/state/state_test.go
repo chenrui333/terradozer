@@ -1,6 +1,8 @@
 package state_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -28,6 +30,10 @@ func TestNewState(t *testing.T) {
 		{
 			name:        "state version 4",
 			pathToState: "../../test/test-fixtures/tfstates/version4.tfstate",
+		},
+		{
+			name:        "state version 4 with Terraform 1.9 provider reference",
+			pathToState: "../../test/test-fixtures/tfstates/version4-tf19-provider.json",
 		},
 		{
 			name:           "broken state file with malformed JSON",
@@ -72,6 +78,11 @@ func TestState_ProviderNames(t *testing.T) {
 			expectedProviderNames: []string{"aws"},
 		},
 		{
+			name:                  "state version 4 with Terraform 1.9 provider reference",
+			pathToState:           "../../test/test-fixtures/tfstates/version4-tf19-provider.json",
+			expectedProviderNames: []string{"aws"},
+		},
+		{
 			name:        "empty state",
 			pathToState: "../../test/test-fixtures/tfstates/empty.tfstate",
 		},
@@ -95,6 +106,29 @@ func TestState_ProviderNames(t *testing.T) {
 
 			assert.Equal(t, tc.expectedProviderNames, actualProviderNames)
 		})
+	}
+}
+
+func TestNewState_SupportsTFStateAndJSONExtensions(t *testing.T) {
+	stateData, err := os.ReadFile("../../test/test-fixtures/tfstates/version4-tf19-provider.json")
+	require.NoError(t, err)
+
+	tmpDir := t.TempDir()
+
+	paths := []string{
+		filepath.Join(tmpDir, "state.tfstate"),
+		filepath.Join(tmpDir, "state.json"),
+		filepath.Join(tmpDir, "state.tfstate.json"),
+	}
+
+	for _, path := range paths {
+		err = os.WriteFile(path, stateData, 0o644)
+		require.NoError(t, err)
+
+		actualState, newStateErr := state.New(path)
+		require.NoError(t, newStateErr)
+		require.NotNil(t, actualState)
+		assert.Equal(t, []string{"aws"}, actualState.ProviderNames())
 	}
 }
 
@@ -135,6 +169,18 @@ func TestState_Resources(t *testing.T) {
 			expectedResources: []terraform.UpdatableResource{
 				resource.NewWithState("aws_vpc",
 					"vpc-003104c0d87e7a9f4",
+					awsProvider, nil),
+			},
+		},
+		{
+			name:        "single AWS resource with Terraform 1.9 provider reference",
+			pathToState: "../../test/test-fixtures/tfstates/version4-tf19-provider.json",
+			providers: map[string]*provider.TerraformProvider{
+				"aws": awsProvider,
+			},
+			expectedResources: []terraform.UpdatableResource{
+				resource.NewWithState("aws_vpc",
+					"vpc-034efaa028f36357d",
 					awsProvider, nil),
 			},
 		},

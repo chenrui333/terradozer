@@ -60,6 +60,14 @@ via the usual [environment variables](https://docs.aws.amazon.com/cli/latest/use
 
 The region information is needed as it is not stored as part of the state. Having multiple providers with different
 regions in one state file is not yet supported.
+
+### State file format
+
+Terradozer expects a valid Terraform state JSON document (the same content format as `terraform.tfstate`).
+
+- The file extension is not used for detection; parsing is content-based.
+- Common names like `terraform.tfstate`, `*.json`, and `*.tfstate.json` are all supported.
+- The file must contain Terraform-managed resources in state format (unsupported or malformed JSON will fail to parse).
  
 ## How it works
 
