@@ -15,7 +15,7 @@ func UserConfirmedDeletion(r io.Reader, force bool) bool {
 	}
 
 	log.Info("Are you sure you want to delete these resources (cannot be undone)? Only YES will be accepted.")
-	fmt.Print(fmt.Sprintf("%23v", "Enter a value: "))
+	fmt.Printf("%23v", "Enter a value: ")
 
 	var response string
 

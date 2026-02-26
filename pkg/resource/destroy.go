@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/apex/log"
@@ -119,7 +120,7 @@ func workerDestroy(resources <-chan DestroyableResource, result chan<- workerRes
 // Destroy destroys a Terraform resource.
 func (r Resource) Destroy() error {
 	if r.State() == nil {
-		return fmt.Errorf("resource state is nil; need to call update first")
+		return errors.New("resource state is nil; need to call update first")
 	}
 
 	err := r.Provider.DestroyResource(r.Type(), *r.State())

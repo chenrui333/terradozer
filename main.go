@@ -6,7 +6,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	stdlog "log"
 	"os"
 	"strings"
@@ -61,7 +61,7 @@ func mainExitCode() int {
 	}
 
 	// discard TRACE logs of GRPCProvider
-	stdlog.SetOutput(ioutil.Discard)
+	stdlog.SetOutput(io.Discard)
 
 	if version {
 		fmt.Println(internal.BuildVersionString())
@@ -168,7 +168,7 @@ func convertToDestroyableResources(resources []terraform.UpdatableResource) []re
 }
 
 func printHelp(fs *flag.FlagSet) {
-	fmt.Fprintf(os.Stderr, "\n"+strings.TrimSpace(help)+"\n")
+	fmt.Fprintf(os.Stderr, "\n%s\n", strings.TrimSpace(help))
 	fs.PrintDefaults()
 	fmt.Println()
 }

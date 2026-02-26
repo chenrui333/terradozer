@@ -3,7 +3,6 @@ package test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -27,7 +26,7 @@ func WriteRemoteStateToLocalFile(t *testing.T, env test.Vars, terraformOptions *
 
 	localStatePath := fmt.Sprintf("%s/%s", os.TempDir(), terraformOptions.BackendConfig["key"].(string))
 
-	err := ioutil.WriteFile(localStatePath, []byte(tfstate), 0644)
+	err := os.WriteFile(localStatePath, []byte(tfstate), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
