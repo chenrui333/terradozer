@@ -1,16 +1,27 @@
+version: 2
+
+project_name: terradozer
+
 builds:
-  - goos:
-      - darwin
-      - windows
-      - linux
-      - freebsd
+  - id: terradozer
+    binary: terradozer
     env:
       - CGO_ENABLED=0
-    ldflags: -s -w -X github.com/jckuester/terradozer/internal.version={{.Version}} -X github.com/jckuester/terradozer/internal.commit={{.ShortCommit}} -X github.com/jckuester/terradozer/internal.date={{.Date}}
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/jckuester/terradozer/internal.version={{.Version}} -X github.com/jckuester/terradozer/internal.commit={{.ShortCommit}} -X github.com/jckuester/terradozer/internal.date={{.Date}}
 
 archives:
-  - format: tar.gz
+  - id: terradozer
+    formats:
+      - tar.gz
     wrap_in_directory: true
-    format_overrides:
-      - goos: windows
-        format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
