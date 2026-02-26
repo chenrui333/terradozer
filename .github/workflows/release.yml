@@ -47,3 +47,21 @@ jobs:
           subject-path: |
             dist/terradozer_*_*_*.tar.gz
             dist/terradozer_*_checksums.txt
+
+      - name: Download attestation bundles
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          for artifact in dist/terradozer_*_*_*.tar.gz dist/terradozer_*_checksums.txt; do
+            gh attestation download "$artifact" --repo "${GITHUB_REPOSITORY}"
+          done
+          mkdir -p dist/attestations
+          mv sha*.jsonl dist/attestations/
+
+      - name: Upload attestation bundles to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: dist/attestations/*.jsonl
+          fail_on_unmatched_files: true

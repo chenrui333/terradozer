@@ -53,8 +53,9 @@ Supported release targets:
 
 ### Verify Release Provenance
 
-Release assets are published with GitHub Artifact Attestations. To verify a downloaded
-asset and checksums file (example: `v0.1.2`):
+Release assets are published with GitHub Artifact Attestations, and matching attestation
+bundles (`sha256*.jsonl`) are attached to each release. To verify a downloaded asset and
+checksums file (example: `v0.1.2`):
 
 ```bash
 VERSION=v0.1.2
@@ -67,6 +68,15 @@ gh attestation verify "$ASSET" --repo chenrui333/terradozer
 gh attestation verify "$CHECKSUMS" --repo chenrui333/terradozer
 
 grep " $ASSET$" "$CHECKSUMS" | shasum -a 256 -c -
+
+# Optional: offline verification with the release-attached bundle for this artifact
+gh release download "$VERSION" --repo chenrui333/terradozer --pattern "sha256*.jsonl"
+DIGEST="$(shasum -a 256 "$ASSET" | awk '{print $1}')"
+BUNDLE="sha256-${DIGEST}.jsonl"
+if [ ! -f "$BUNDLE" ]; then
+  BUNDLE="sha256:${DIGEST}.jsonl"
+fi
+gh attestation verify "$ASSET" --repo chenrui333/terradozer --bundle "$BUNDLE"
 ```
 
 Here is the recommended way to install a specific version (example: `v0.1.2`):
