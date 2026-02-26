@@ -284,12 +284,185 @@ func getResourceState(resInstance *states.ResourceInstance, rType string,
 		return cty.NilVal, err
 	}
 
-	resInstanceObj, err := resInstance.Current.Decode(resourceSchema.Block.ImpliedType())
+	resInstanceObj, filteredUnknownAttrs, err := decodeResourceInstanceObject(
+		resInstance, resourceSchema.Block.ImpliedType())
 	if err != nil {
 		return cty.NilVal, err
 	}
 
+	if filteredUnknownAttrs {
+		log.WithField("type", rType).Debug(internal.Pad("ignored unknown attributes in resource state"))
+	}
+
 	return resInstanceObj.Value, nil
+}
+
+func decodeResourceInstanceObject(
+	resInstance *states.ResourceInstance, schemaType cty.Type) (*states.ResourceInstanceObject, bool, error) {
+	resInstanceObj, err := resInstance.Current.Decode(schemaType)
+	if err == nil {
+		return resInstanceObj, false, nil
+	}
+
+	if resInstance.Current.AttrsJSON == nil {
+		return nil, false, err
+	}
+
+	attrsJSONPruned, changed, pruneErr := pruneUnknownAttributesFromJSON(resInstance.Current.AttrsJSON, schemaType)
+	if pruneErr != nil || !changed {
+		return nil, false, err
+	}
+
+	current := *resInstance.Current
+	current.AttrsJSON = attrsJSONPruned
+
+	resInstanceObj, decodeErr := current.Decode(schemaType)
+	if decodeErr != nil {
+		return nil, false, err
+	}
+
+	return resInstanceObj, true, nil
+}
+
+func pruneUnknownAttributesFromJSON(attrsJSON []byte, schemaType cty.Type) ([]byte, bool, error) {
+	var raw any
+
+	err := json.Unmarshal(attrsJSON, &raw)
+	if err != nil {
+		return nil, false, err
+	}
+
+	pruned, changed := pruneUnknownAttributes(raw, schemaType)
+	if !changed {
+		return attrsJSON, false, nil
+	}
+
+	prunedJSON, err := json.Marshal(pruned)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return prunedJSON, true, nil
+}
+
+func pruneUnknownAttributes(raw any, schemaType cty.Type) (any, bool) {
+	if raw == nil || schemaType == cty.DynamicPseudoType {
+		return raw, false
+	}
+
+	if schemaType.IsObjectType() {
+		return pruneUnknownObjectAttributes(raw, schemaType)
+	}
+
+	if schemaType.IsMapType() {
+		return pruneUnknownMapAttributes(raw, schemaType.ElementType())
+	}
+
+	if schemaType.IsListType() || schemaType.IsSetType() {
+		return pruneUnknownListAttributes(raw, schemaType.ElementType())
+	}
+
+	if schemaType.IsTupleType() {
+		return pruneUnknownTupleAttributes(raw, schemaType.TupleElementTypes())
+	}
+
+	return raw, false
+}
+
+func pruneUnknownObjectAttributes(raw any, schemaType cty.Type) (any, bool) {
+	rawObject, ok := raw.(map[string]any)
+	if !ok {
+		return raw, false
+	}
+
+	attrTypes := schemaType.AttributeTypes()
+	prunedObject := make(map[string]any, len(rawObject))
+	changed := false
+
+	for key, value := range rawObject {
+		attrType, ok := attrTypes[key]
+		if !ok {
+			changed = true
+			continue
+		}
+
+		prunedValue, valueChanged := pruneUnknownAttributes(value, attrType)
+		if valueChanged {
+			changed = true
+		}
+
+		prunedObject[key] = prunedValue
+	}
+
+	return prunedObject, changed
+}
+
+func pruneUnknownMapAttributes(raw any, elemType cty.Type) (any, bool) {
+	rawMap, ok := raw.(map[string]any)
+	if !ok {
+		return raw, false
+	}
+
+	prunedMap := make(map[string]any, len(rawMap))
+	changed := false
+
+	for key, value := range rawMap {
+		prunedValue, valueChanged := pruneUnknownAttributes(value, elemType)
+		if valueChanged {
+			changed = true
+		}
+
+		prunedMap[key] = prunedValue
+	}
+
+	return prunedMap, changed
+}
+
+func pruneUnknownListAttributes(raw any, elemType cty.Type) (any, bool) {
+	rawList, ok := raw.([]any)
+	if !ok {
+		return raw, false
+	}
+
+	prunedList := make([]any, len(rawList))
+	changed := false
+
+	for idx, value := range rawList {
+		prunedValue, valueChanged := pruneUnknownAttributes(value, elemType)
+		if valueChanged {
+			changed = true
+		}
+
+		prunedList[idx] = prunedValue
+	}
+
+	return prunedList, changed
+}
+
+func pruneUnknownTupleAttributes(raw any, elemTypes []cty.Type) (any, bool) {
+	rawTuple, ok := raw.([]any)
+	if !ok {
+		return raw, false
+	}
+
+	prunedTuple := make([]any, len(rawTuple))
+	changed := false
+
+	for idx, value := range rawTuple {
+		elemType := cty.DynamicPseudoType
+		if idx < len(elemTypes) {
+			elemType = elemTypes[idx]
+		}
+
+		prunedValue, valueChanged := pruneUnknownAttributes(value, elemType)
+		if valueChanged {
+			changed = true
+		}
+
+		prunedTuple[idx] = prunedValue
+	}
+
+	return prunedTuple, changed
 }
 
 // copied (and modified) from github.com/hashicorp/terraform/command/state_meta.go
