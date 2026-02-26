@@ -258,6 +258,10 @@ func TestResource_Destroy_AwsLambdaFunction(t *testing.T) {
 }
 
 func TestResource_Destroy_Timeout(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test.")
+	}
+
 	env := testUtil.Init(t)
 
 	err := testUtil.SetMultiEnvs(map[string]string{
