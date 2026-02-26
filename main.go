@@ -102,6 +102,9 @@ func mainExitCode() int {
 	internal.LogTitle("reading state")
 	log.WithField("file", pathToState).Info(internal.Pad("using state"))
 
+	setAWSRegionFromDefault()
+	setAWSProfileToDefault()
+
 	providers, err := provider.InitProviders(tfstate.ProviderNames(), "~/.terradozer", timeoutDuration)
 	if err != nil {
 		fmt.Fprint(os.Stderr, color.RedString("\nError:️ failed to initialize Terraform providers: %s\n", err))
@@ -165,6 +168,27 @@ func convertToDestroyableResources(resources []terraform.UpdatableResource) []re
 	}
 
 	return result
+}
+
+func setAWSRegionFromDefault() {
+	if os.Getenv("AWS_REGION") != "" {
+		return
+	}
+
+	defaultRegion := os.Getenv("AWS_DEFAULT_REGION")
+	if defaultRegion == "" {
+		return
+	}
+
+	_ = os.Setenv("AWS_REGION", defaultRegion)
+}
+
+func setAWSProfileToDefault() {
+	if os.Getenv("AWS_PROFILE") != "" {
+		return
+	}
+
+	_ = os.Setenv("AWS_PROFILE", "default")
 }
 
 func printHelp(fs *flag.FlagSet) {
