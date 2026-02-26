@@ -207,7 +207,7 @@ require (
 	github.com/posener/complete v1.2.1 // indirect
 	github.com/pquerna/otp v1.2.0 // indirect
 	github.com/spf13/afero v1.2.1 // indirect
-	github.com/ulikunitz/xz v0.5.5 // indirect
+	github.com/ulikunitz/xz v0.5.14 // indirect
 	github.com/vmihailenco/msgpack/v4 v4.3.12 // indirect
 	github.com/vmihailenco/tagparser v0.1.1 // indirect
 	github.com/zclconf/go-cty-yaml v1.0.1 // indirect
