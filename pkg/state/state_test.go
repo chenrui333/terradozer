@@ -30,6 +30,10 @@ func TestNewState(t *testing.T) {
 			pathToState: "../../test/test-fixtures/tfstates/version4.tfstate",
 		},
 		{
+			name:        "state version 4 with Terraform 1.9 provider reference",
+			pathToState: "../../test/test-fixtures/tfstates/version4-tf19-provider.json",
+		},
+		{
 			name:           "broken state file with malformed JSON",
 			pathToState:    "../../test/test-fixtures/tfstates/malformed.tfstate",
 			expectedErrMsg: "failed reading ../../test/test-fixtures/tfstates/malformed.tfstate as a statefile",
@@ -69,6 +73,11 @@ func TestState_ProviderNames(t *testing.T) {
 		{
 			name:                  "state version 4",
 			pathToState:           "../../test/test-fixtures/tfstates/version4.tfstate",
+			expectedProviderNames: []string{"aws"},
+		},
+		{
+			name:                  "state version 4 with Terraform 1.9 provider reference",
+			pathToState:           "../../test/test-fixtures/tfstates/version4-tf19-provider.json",
 			expectedProviderNames: []string{"aws"},
 		},
 		{
@@ -135,6 +144,18 @@ func TestState_Resources(t *testing.T) {
 			expectedResources: []terraform.UpdatableResource{
 				resource.NewWithState("aws_vpc",
 					"vpc-003104c0d87e7a9f4",
+					awsProvider, nil),
+			},
+		},
+		{
+			name:        "single AWS resource with Terraform 1.9 provider reference",
+			pathToState: "../../test/test-fixtures/tfstates/version4-tf19-provider.json",
+			providers: map[string]*provider.TerraformProvider{
+				"aws": awsProvider,
+			},
+			expectedResources: []terraform.UpdatableResource{
+				resource.NewWithState("aws_vpc",
+					"vpc-034efaa028f36357d",
 					awsProvider, nil),
 			},
 		},

@@ -2,10 +2,12 @@
 package state
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 
 	"github.com/apex/log"
@@ -17,6 +19,10 @@ import (
 	"github.com/jckuester/terradozer/internal"
 	"github.com/jckuester/terradozer/pkg/resource"
 	"github.com/zclconf/go-cty/cty"
+)
+
+var modernProviderReferencePattern = regexp.MustCompile(
+	`^((?:module\.[^.]+\.)*)provider\["registry\.terraform\.io/[^/]+/([^"\]]+)"\](?:\.(.+))?$`,
 )
 
 // State represents a Terraform state.
@@ -36,20 +42,118 @@ func New(path string) (*State, error) {
 
 // copied from github.com/hashicorp/terraform/command/show.go
 func getStateFromPath(path string) (*statefile.File, error) {
-	f, err := os.Open(path)
+	stateData, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
 
-	var stateFile *statefile.File
-
-	stateFile, err = statefile.Read(f)
+	stateFile, err := readStateFile(stateData)
 	if err != nil {
 		return nil, fmt.Errorf("failed reading %s as a statefile: %s", path, err)
 	}
 
+	if len(stateFile.State.ProviderAddrs()) > 0 || !stateJSONHasResources(stateData) {
+		return stateFile, nil
+	}
+
+	normalizedStateData, changed := normalizeProviderReferences(stateData)
+	if !changed {
+		return stateFile, nil
+	}
+
+	normalizedStateFile, normalizeErr := readStateFile(normalizedStateData)
+	if normalizeErr == nil {
+		log.WithField("file", path).Debug(internal.Pad("normalized Terraform 1.x provider references"))
+
+		return normalizedStateFile, nil
+	}
+
 	return stateFile, nil
+}
+
+func readStateFile(stateData []byte) (*statefile.File, error) {
+	stateFile, err := statefile.Read(bytes.NewReader(stateData))
+	if err != nil {
+		return nil, err
+	}
+
+	return stateFile, nil
+}
+
+func stateJSONHasResources(stateData []byte) bool {
+	var rawState struct {
+		Resources []json.RawMessage `json:"resources"`
+	}
+
+	err := json.Unmarshal(stateData, &rawState)
+	if err != nil {
+		return false
+	}
+
+	return len(rawState.Resources) > 0
+}
+
+func normalizeProviderReferences(stateData []byte) ([]byte, bool) {
+	var rawState map[string]any
+
+	err := json.Unmarshal(stateData, &rawState)
+	if err != nil {
+		return stateData, false
+	}
+
+	rawResources, ok := rawState["resources"].([]any)
+	if !ok {
+		return stateData, false
+	}
+
+	changed := false
+
+	for _, rawResource := range rawResources {
+		resourceMap, ok := rawResource.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		providerRef, ok := resourceMap["provider"].(string)
+		if !ok {
+			continue
+		}
+
+		normalizedProviderRef, providerRefChanged := normalizeProviderReference(providerRef)
+		if providerRefChanged {
+			resourceMap["provider"] = normalizedProviderRef
+			changed = true
+		}
+	}
+
+	if !changed {
+		return stateData, false
+	}
+
+	normalizedStateData, err := json.Marshal(rawState)
+	if err != nil {
+		return stateData, false
+	}
+
+	return normalizedStateData, true
+}
+
+func normalizeProviderReference(providerRef string) (string, bool) {
+	matches := modernProviderReferencePattern.FindStringSubmatch(providerRef)
+	if len(matches) != 4 {
+		return providerRef, false
+	}
+
+	modulePrefix := matches[1]
+	providerType := matches[2]
+	providerAlias := matches[3]
+
+	normalizedProviderRef := modulePrefix + "provider." + providerType
+	if providerAlias != "" {
+		normalizedProviderRef = normalizedProviderRef + "." + providerAlias
+	}
+
+	return normalizedProviderRef, true
 }
 
 // ProviderNames returns a list of all provider names (e.g., "aws", "google") in the state.
