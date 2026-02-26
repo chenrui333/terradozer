@@ -108,10 +108,18 @@ CRUD API via GRPC (e.g., calling the Terraform AWS Provider to destroy a `aws_in
 
 This repository uses Renovate with config at `.github/renovate.json`.
 
-- Go modules (`go.mod`/`go.sum`) and GitHub Actions dependencies are monitored.
+- Go modules (`cli/go.mod`, `awslib/go.mod`) and GitHub Actions dependencies are monitored.
 - Minor/patch updates are grouped by manager and configured for auto-merge.
 - Major updates are isolated and require manual dashboard approval/review.
 - Renovate uses semantic commit messages (`chore(deps): ...`) and applies dependency labels.
+
+## Repository layout
+
+Terradozer is organized as a Go monorepo.
+
+- `cli/` contains the Terradozer CLI Go module.
+- `awslib/` is maintained in-repo as a separate Go module.
+- `go.work` wires both modules together for local development and CI.
 
 ## Tests
 
@@ -121,8 +129,8 @@ unit tests.
 
 Run unit tests
 
-    make test
+    make -C cli test
     
 Run acceptance and integration tests
 
-    AWS_PROFILE=<myaccount> AWS_REGION=<myregion> make test-all
+    AWS_PROFILE=<myaccount> AWS_REGION=<myregion> make -C cli test-all
