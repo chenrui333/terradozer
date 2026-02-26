@@ -12,6 +12,7 @@
     "after 9am and before 5pm every weekday"
   ],
   "dependencyDashboard": true,
+  "platformAutomerge": true,
   "labels": [
     "dependencies"
   ],
