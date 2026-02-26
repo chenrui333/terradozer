@@ -68,6 +68,15 @@ Terradozer first scans a given Terraform state file (read-only) to find all reso
 then downloads the necessary Terraform Provider Plugins to call the destroy function for each resource on the respective
 CRUD API via GRPC (e.g., calling the Terraform AWS Provider to destroy a `aws_instance` resource).
 
+## Dependency updates
+
+This repository uses Renovate with config at `.github/renovate.json`.
+
+- Go modules (`go.mod`/`go.sum`) and GitHub Actions dependencies are monitored.
+- Minor/patch updates are grouped by manager and configured for auto-merge.
+- Major updates are isolated and require manual dashboard approval/review.
+- Renovate uses semantic commit messages (`chore(deps): ...`) and applies dependency labels.
+
 ## Tests
 
 This section is only relevant if you want to contribute to Terradozer and therefore run the tests. Terradozer has

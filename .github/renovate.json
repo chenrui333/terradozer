@@ -1,0 +1,74 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "enabledManagers": [
+    "gomod",
+    "github-actions"
+  ],
+  "timezone": "America/New_York",
+  "schedule": [
+    "after 9am and before 5pm every weekday"
+  ],
+  "dependencyDashboard": true,
+  "platformAutomerge": true,
+  "labels": [
+    "dependencies"
+  ],
+  "reviewers": [
+    "chenrui333"
+  ],
+  "semanticCommits": "enabled",
+  "semanticCommitType": "chore",
+  "semanticCommitScope": "deps",
+  "packageRules": [
+    {
+      "description": "Group all non-major Go module updates and enable automerge.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
+      "groupName": "go non-major dependencies",
+      "labels": [
+        "dependencies",
+        "go"
+      ],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Group all non-major GitHub Actions updates and enable automerge.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
+      "groupName": "github-actions non-major dependencies",
+      "labels": [
+        "dependencies"
+      ],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Keep major updates isolated and require manual review.",
+      "matchManagers": [
+        "gomod",
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "dependencyDashboardApproval": true
+    }
+  ]
+}
