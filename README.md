@@ -66,7 +66,8 @@ To delete all resources in a Terraform state file:
 
 To see all options, run `terradozer --help`. Provide credentials for the AWS account you want to destroy resources in
 via the usual [environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html), e.g.,
-`AWS_PROFILE=<myaccount>` and `AWS_DEFAULT_REGION=<myregion>`.
+`AWS_PROFILE=<myaccount>` and either `AWS_REGION=<myregion>` or `AWS_DEFAULT_REGION=<myregion>`.
+If `AWS_PROFILE` is unset, terradozer uses the `default` profile.
 
 The region information is needed as it is not stored as part of the state. Having multiple providers with different
 regions in one state file is not yet supported.
@@ -106,4 +107,4 @@ Run unit tests
     
 Run acceptance and integration tests
 
-    AWS_PROFILE=<myaccount> AWS_DEFAULT_REGION=<myregion> make test-all
+    AWS_PROFILE=<myaccount> AWS_REGION=<myregion> make test-all

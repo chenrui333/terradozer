@@ -5,3 +5,4 @@
 *.backup
 bin/
 coverage.txt
+terradozer
