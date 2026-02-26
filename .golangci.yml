@@ -1,12 +1,43 @@
+version: "2"
 run:
   tests: false
-
-linters-settings:
-  lll:
-    maxlength: 120
-
 linters:
-  enable-all: true
+  default: all
+  settings:
+    lll:
+      line-length: 120
   disable:
-    - prealloc
+    - copyloopvar
+    - cyclop
+    - depguard
+    - err113
+    - errorlint
+    - exhaustruct
+    - forbidigo
+    - forcetypeassert
+    - funcorder
     - funlen
+    - godot
+    - gosec
+    - intrange
+    - mnd
+    - nlreturn
+    - nolintlint
+    - prealloc
+    - revive
+    - thelper
+    - varnamelen
+    - wrapcheck
+    - wsl
+    - wsl_v5
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

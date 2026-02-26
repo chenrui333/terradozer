@@ -3,6 +3,7 @@ package state
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -141,7 +142,7 @@ func getResourceID(resInstance *states.ResourceInstance) (string, error) {
 	var result resourceID
 
 	if !resInstance.HasCurrent() {
-		return "", fmt.Errorf("resource instance has no current object")
+		return "", errors.New("resource instance has no current object")
 	}
 
 	if resInstance.Current.AttrsJSON != nil {
@@ -160,7 +161,7 @@ func getResourceID(resInstance *states.ResourceInstance) (string, error) {
 		log.WithField("attributes", resInstance.Current.AttrsFlat).
 			Debug(internal.Pad("legacy attributes of resource instance"))
 
-		return "", fmt.Errorf("flat attribute map of resource instance is nil")
+		return "", errors.New("flat attribute map of resource instance is nil")
 	}
 
 	return resInstance.Current.AttrsFlat["id"], nil
@@ -171,7 +172,7 @@ func getResourceID(resInstance *states.ResourceInstance) (string, error) {
 func getResourceState(resInstance *states.ResourceInstance, rType string,
 	provider *provider.TerraformProvider) (cty.Value, error) {
 	if !resInstance.HasCurrent() {
-		return cty.NilVal, fmt.Errorf("resource instance has no current object")
+		return cty.NilVal, errors.New("resource instance has no current object")
 	}
 
 	resourceSchema, err := provider.GetSchemaForResource(rType)

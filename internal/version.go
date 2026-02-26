@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"fmt"
 	"runtime"
 )
 
@@ -13,17 +12,17 @@ var (
 )
 
 func BuildVersionString() string {
-	var result = fmt.Sprintf("version: %s", version)
+	result := "version: " + version
 
 	if commit != "" {
-		result = fmt.Sprintf("%s\ncommit: %s", result, commit)
+		result += "\ncommit: " + commit
 	}
 
 	if date != "" {
-		result = fmt.Sprintf("%s\nbuilt at: %s", result, date)
+		result += "\nbuilt at: " + date
 	}
 
-	result = fmt.Sprintf("%s\nusing: %s", result, runtime.Version())
+	result += "\nusing: " + runtime.Version()
 
 	return result
 }
