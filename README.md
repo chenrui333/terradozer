@@ -5,7 +5,7 @@
 </p>
 
 ---
-[![Release](https://img.shields.io/github/release/jckuester/terradozer.svg?style=for-the-badge)](https://github.com/jckuester/terradozer/releases/latest)
+[![Release](https://img.shields.io/github/release/chenrui333/terradozer.svg?style=for-the-badge)](https://github.com/chenrui333/terradozer/releases/latest)
 [![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=for-the-badge)](/LICENSE.md)
 [![CI](https://img.shields.io/github/actions/workflow/status/chenrui333/terradozer/ci.yml?style=for-the-badge)](https://github.com/chenrui333/terradozer/actions/workflows/ci.yml)
 [![Codecov branch](https://img.shields.io/codecov/c/github/jckuester/terradozer/master.svg?style=for-the-badge)](https://codecov.io/gh/jckuester/terradozer)
@@ -39,13 +39,23 @@ Happy (terra)dozing!
 ## Installation
 
 It's recommended to install a specific version of terradozer available on the
-[releases page](https://github.com/jckuester/terradozer/releases).
+[releases page](https://github.com/chenrui333/terradozer/releases).
 
-Here is the recommended way to install terradozer v0.1.2:
+GoReleaser publishes release assets with these names:
+
+- `terradozer_<version>_<os>_<arch>.tar.gz`
+- `terradozer_<version>_checksums.txt`
+
+Supported release targets:
+
+- `os`: `darwin`, `linux`
+- `arch`: `amd64`, `arm64`
+
+Here is the recommended way to install a specific version (example: `v0.1.2`):
 
 ```bash
 # install it into ./bin/
-curl -sSfL https://raw.githubusercontent.com/jckuester/terradozer/master/install.sh | sh -s v0.1.2
+curl -sSfL https://raw.githubusercontent.com/chenrui333/terradozer/main/install.sh | sh -s v0.1.2
 ```
 
 ## Usage
