@@ -51,6 +51,9 @@ func (p *providerPoolThreadSafe) closeAll(cause error) error {
 
 func providerConfigForClientKey(key aws.ClientKey) cty.Value {
 	config := provider.AWSProviderConfig().AsValueMap()
+	config["access_key"] = cty.UnknownVal(cty.DynamicPseudoType)
+	config["secret_key"] = cty.UnknownVal(cty.DynamicPseudoType)
+	config["token"] = cty.UnknownVal(cty.DynamicPseudoType)
 	config[logFieldProfile] = cty.StringVal(key.Profile)
 	config[logFieldRegion] = cty.StringVal(key.Region)
 
