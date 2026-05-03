@@ -3,6 +3,7 @@ package resource_test
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -138,6 +139,125 @@ func TestDestroyResources_DestroyError(t *testing.T) {
 
 	actualDeletionCount := resource.DestroyResources([]resource.DestroyableResource{m}, 3)
 	assert.Equal(t, actualDeletionCount, 0)
+}
+
+func TestDestroyResources_OrdersAWSResourcesByPriority(t *testing.T) {
+	var actualOrder []string
+	resources := []resource.DestroyableResource{
+		&recordingDestroyableResource{resourceType: "aws_vpc", order: &actualOrder},
+		&recordingDestroyableResource{resourceType: "aws_eks_cluster", order: &actualOrder},
+		&recordingDestroyableResource{resourceType: "aws_eks_addon", order: &actualOrder},
+		&recordingDestroyableResource{resourceType: "aws_subnet", order: &actualOrder},
+		&recordingDestroyableResource{resourceType: "aws_security_group_rule", order: &actualOrder},
+		&recordingDestroyableResource{resourceType: "custom_resource", order: &actualOrder},
+	}
+
+	actualDeletionCount := resource.DestroyResources(resources, 1)
+
+	assert.Equal(t, len(resources), actualDeletionCount)
+	assert.Equal(t, []string{
+		"custom_resource",
+		"aws_eks_addon",
+		"aws_eks_cluster",
+		"aws_security_group_rule",
+		"aws_subnet",
+		"aws_vpc",
+	}, actualOrder)
+}
+
+func TestDestroyResources_WaitsForPriorityBucketBeforeNextBucket(t *testing.T) {
+	lowPriorityStarted := make(chan struct{})
+	releaseLowPriority := make(chan struct{})
+	highPriorityStarted := make(chan struct{})
+	done := make(chan int, 1)
+
+	resources := []resource.DestroyableResource{
+		&blockingDestroyableResource{resourceType: "aws_vpc", started: highPriorityStarted},
+		&blockingDestroyableResource{
+			resourceType: "aws_eks_addon",
+			started:      lowPriorityStarted,
+			release:      releaseLowPriority,
+		},
+	}
+
+	go func() {
+		done <- resource.DestroyResources(resources, 2)
+	}()
+
+	select {
+	case <-lowPriorityStarted:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for low-priority-number resource to start")
+	}
+
+	select {
+	case <-highPriorityStarted:
+		t.Fatal("higher-priority-number resource started before earlier priority bucket finished")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(releaseLowPriority)
+
+	select {
+	case <-highPriorityStarted:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for higher-priority-number resource to start")
+	}
+
+	select {
+	case actualDeletionCount := <-done:
+		assert.Equal(t, len(resources), actualDeletionCount)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for destroy to finish")
+	}
+}
+
+type recordingDestroyableResource struct {
+	resourceType string
+	order        *[]string
+}
+
+func (r *recordingDestroyableResource) Destroy() error {
+	*r.order = append(*r.order, r.resourceType)
+
+	return nil
+}
+
+func (r *recordingDestroyableResource) Type() string {
+	return r.resourceType
+}
+
+func (r *recordingDestroyableResource) ID() string {
+	return r.resourceType
+}
+
+type blockingDestroyableResource struct {
+	resourceType string
+	closeOnce    sync.Once
+	started      chan<- struct{}
+	release      <-chan struct{}
+}
+
+func (r *blockingDestroyableResource) Destroy() error {
+	r.closeOnce.Do(func() {
+		if r.started != nil {
+			close(r.started)
+		}
+	})
+
+	if r.release != nil {
+		<-r.release
+	}
+
+	return nil
+}
+
+func (r *blockingDestroyableResource) Type() string {
+	return r.resourceType
+}
+
+func (r *blockingDestroyableResource) ID() string {
+	return r.resourceType
 }
 
 func TestResource_Destroy(t *testing.T) {

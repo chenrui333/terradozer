@@ -6,10 +6,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/ecs"
-	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/aws/aws-sdk-go/service/lambda"
+	"github.com/aws/aws-sdk-go/aws/awserr"     //nolint:staticcheck // Acceptance helpers still use AWS SDK v1.
+	"github.com/aws/aws-sdk-go/service/ecs"    //nolint:staticcheck // Acceptance helpers still use AWS SDK v1.
+	"github.com/aws/aws-sdk-go/service/iam"    //nolint:staticcheck // Acceptance helpers still use AWS SDK v1.
+	"github.com/aws/aws-sdk-go/service/lambda" //nolint:staticcheck // Acceptance helpers still use AWS SDK v1.
 	"github.com/gruntwork-io/terratest/modules/aws"
 	"github.com/gruntwork-io/terratest/modules/terraform"
 	"github.com/jckuester/awstools-lib/test"
