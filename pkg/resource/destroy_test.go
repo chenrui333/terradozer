@@ -42,6 +42,22 @@ func TestDestroyResources(t *testing.T) {
 			parallel:              1,
 		},
 		{
+			name: "single resource deleted when parallel is zero",
+			failedDeletions: map[string]int{
+				"aws_vpc": 0,
+			},
+			expectedDeletionCount: 1,
+			parallel:              0,
+		},
+		{
+			name: "single resource deleted when parallel is negative",
+			failedDeletions: map[string]int{
+				"aws_vpc": 0,
+			},
+			expectedDeletionCount: 1,
+			parallel:              -1,
+		},
+		{
 			name: "single resource failed in first run",
 			failedDeletions: map[string]int{
 				"aws_vpc": 1,

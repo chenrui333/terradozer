@@ -78,6 +78,13 @@ func mainExitCode() int {
 		return 1
 	}
 
+	if parallel < 1 {
+		fmt.Fprint(os.Stderr, color.RedString("Error: -parallel flag must be greater than 0\n"))
+		printHelp(flags)
+
+		return 1
+	}
+
 	timeoutDuration, err := time.ParseDuration(timeout)
 	if err != nil {
 		fmt.Fprint(os.Stderr, color.RedString("Error: failed to parse timeout flag: %s\n", err))
