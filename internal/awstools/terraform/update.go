@@ -85,7 +85,11 @@ func UpdateStates(resources []Resource, providers map[aws.ClientKey]provider.Ter
 			p, ok := providers[key]
 
 			if !ok {
-				panic(fmt.Sprintf("could not find Terraform AWS Provider for key: %v", key))
+				result.Lock()
+				result.Errors = append(result.Errors,
+					fmt.Errorf("could not find Terraform AWS Provider for key: %v", key))
+				result.Unlock()
+				return
 			}
 
 			r.Provider = &p

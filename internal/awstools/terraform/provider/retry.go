@@ -46,6 +46,10 @@ var (
 // Note: the given error is checked against retryable error codes of the AWS SDK API v1,
 // since Terraform AWS Provider also uses v1.
 func shouldRetry(err error) bool {
+	if err == nil {
+		return false
+	}
+
 	return isCodeRetryable(err) || isCodeThrottle(err)
 }
 

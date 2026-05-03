@@ -3,12 +3,10 @@ package terraform
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
 	"github.com/apex/log"
-	"github.com/fatih/color"
 	"github.com/jckuester/terradozer/internal/awstools/aws"
 	"github.com/jckuester/terradozer/internal/awstools/terraform/provider"
 	"github.com/zclconf/go-cty/cty"
@@ -36,13 +34,26 @@ func NewProviderPool(ctx context.Context, clientKeys []aws.ClientKey, version, i
 	map[aws.ClientKey]provider.TerraformProvider, error) {
 	metaPlugin, err := provider.Install("aws", version, installDir)
 	if err != nil {
-		fmt.Fprint(os.Stderr, color.RedString("failed to install provider (%s): %s", "aws", err))
+		return nil, fmt.Errorf("failed to install provider (%s): %w", "aws", err)
 	}
 
-	errors := make(chan error)
-	wgDone := make(chan bool)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	var wg sync.WaitGroup
+	var errOnce sync.Once
+	var firstErr error
+
+	recordErr := func(err error) {
+		if err == nil {
+			return
+		}
+
+		errOnce.Do(func() {
+			firstErr = err
+			cancel()
+		})
+	}
 
 	providerPool := &providerPoolThreadSafe{
 		providers: make(map[aws.ClientKey]provider.TerraformProvider),
@@ -51,17 +62,15 @@ func NewProviderPool(ctx context.Context, clientKeys []aws.ClientKey, version, i
 	clientKeys = removeDuplicateClientKeys(clientKeys)
 
 	if len(clientKeys) > 0 {
-		wg.Add(len(clientKeys))
-
 		for _, clientKey := range clientKeys {
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			default:
-			}
-
-			go func(p string, r string) {
-				defer wg.Done()
+			p := clientKey.Profile
+			r := clientKey.Region
+			wg.Go(func() {
+				err := ctx.Err()
+				if err != nil {
+					recordErr(err)
+					return
+				}
 
 				log.WithFields(log.Fields{
 					logFieldProfile: p,
@@ -70,7 +79,7 @@ func NewProviderPool(ctx context.Context, clientKeys []aws.ClientKey, version, i
 
 				pr, err := provider.Launch(ctx, metaPlugin.Path, timeout)
 				if err != nil {
-					errors <- fmt.Errorf("failed to launch provider (%s): %s", metaPlugin.Path, err)
+					recordErr(fmt.Errorf("failed to launch provider (%s): %w", metaPlugin.Path, err))
 					return
 				}
 
@@ -100,11 +109,18 @@ func NewProviderPool(ctx context.Context, clientKeys []aws.ClientKey, version, i
 
 				err = pr.Configure(config)
 				if err != nil {
-					pr.Close()
+					_ = pr.Close()
 
-					errors <- fmt.Errorf("failed to configure provider (name=%s, version=%s): %s",
-						metaPlugin.Name, metaPlugin.Version, err)
+					recordErr(fmt.Errorf("failed to configure provider (name=%s, version=%s): %w",
+						metaPlugin.Name, metaPlugin.Version, err))
 
+					return
+				}
+
+				err = ctx.Err()
+				if err != nil {
+					_ = pr.Close()
+					recordErr(err)
 					return
 				}
 
@@ -116,26 +132,20 @@ func NewProviderPool(ctx context.Context, clientKeys []aws.ClientKey, version, i
 					logFieldProfile: p,
 					logFieldRegion:  r,
 				}).Debugf("launched new instance of Terraform AWS Provider")
-			}(clientKey.Profile, clientKey.Region)
+			})
 		}
 	}
 
-	go func() {
-		wg.Wait()
-		close(wgDone)
-	}()
+	wg.Wait()
 
-	select {
-	case <-wgDone:
-		break
-	case err := <-errors:
-		close(errors)
-
+	if firstErr != nil {
+		providerPool.Lock()
 		for _, p := range providerPool.providers {
 			_ = p.Close()
 		}
+		providerPool.Unlock()
 
-		return nil, err
+		return nil, firstErr
 	}
 
 	return providerPool.providers, nil

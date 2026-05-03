@@ -18,16 +18,59 @@ type ClientKey struct {
 	Profile, Region string
 }
 
+func (p *clientPoolThreadSafe) set(key ClientKey, client Client) {
+	p.Lock()
+	p.clients[key] = client
+	p.Unlock()
+}
+
+func startClient(
+	wg *sync.WaitGroup,
+	ctx context.Context,
+	recordErr func(error),
+	store func(*Client),
+	configs ...func(*config.LoadOptions) error,
+) {
+	wg.Go(func() {
+		err := ctx.Err()
+		if err != nil {
+			recordErr(err)
+			return
+		}
+
+		client, err := NewClient(ctx, configs...)
+		if err != nil {
+			recordErr(err)
+			return
+		}
+
+		store(client)
+	})
+}
+
 // NewClientPool creates an AWS client for each permutation of the given profiles and regions.
 // If profiles, regions, or both are empty, credentials and regions are picked up via
 // the usual default provider chain, respectively. For example, if regions are empty,
 // the region is first looked for via the according region environment variable or
 // second the default region for each profile is used from `~/.aws/config`.
 func NewClientPool(ctx context.Context, profiles []string, regions []string) (map[ClientKey]Client, error) {
-	errors := make(chan error)
-	wgDone := make(chan bool)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	var wg sync.WaitGroup
+	var errOnce sync.Once
+	var firstErr error
+
+	recordErr := func(err error) {
+		if err == nil {
+			return
+		}
+
+		errOnce.Do(func() {
+			firstErr = err
+			cancel()
+		})
+	}
 
 	clientPool := &clientPoolThreadSafe{
 		clients: make(map[ClientKey]Client),
@@ -35,67 +78,49 @@ func NewClientPool(ctx context.Context, profiles []string, regions []string) (ma
 
 	switch {
 	case len(profiles) > 0 && len(regions) > 0:
-		wg.Add(len(profiles) * len(regions))
-
 		for _, profile := range profiles {
 			for _, region := range regions {
-				go func(p string, r string) {
-					defer wg.Done()
-
-					client, err := NewClient(
-						ctx,
-						config.WithSharedConfigProfile(p),
-						config.WithRegion(r))
-					if err != nil {
-						errors <- err
-						return
-					}
-
-					client.Profile = p
-
-					clientPool.Lock()
-					clientPool.clients[ClientKey{p, client.Region}] = *client
-					clientPool.Unlock()
-				}(profile, region)
+				p := profile
+				r := region
+				startClient(
+					&wg,
+					ctx,
+					recordErr,
+					func(client *Client) {
+						client.Profile = p
+						clientPool.set(ClientKey{p, client.Region}, *client)
+					},
+					config.WithSharedConfigProfile(p),
+					config.WithRegion(r),
+				)
 			}
 		}
 	case len(profiles) > 0:
-		wg.Add(len(profiles))
-
 		for _, profile := range profiles {
-			go func(p string) {
-				defer wg.Done()
-
-				client, err := NewClient(ctx, config.WithSharedConfigProfile(p))
-				if err != nil {
-					errors <- err
-					return
-				}
-
-				client.Profile = p
-
-				clientPool.Lock()
-				clientPool.clients[ClientKey{p, client.Region}] = *client
-				clientPool.Unlock()
-			}(profile)
+			p := profile
+			startClient(
+				&wg,
+				ctx,
+				recordErr,
+				func(client *Client) {
+					client.Profile = p
+					clientPool.set(ClientKey{p, client.Region}, *client)
+				},
+				config.WithSharedConfigProfile(p),
+			)
 		}
 	case len(regions) > 0:
-		wg.Add(len(regions))
-
 		for _, region := range regions {
-			go func(r string) {
-				defer wg.Done()
-
-				client, err := NewClient(ctx, config.WithRegion(r))
-				if err != nil {
-					errors <- err
-					return
-				}
-
-				clientPool.Lock()
-				clientPool.clients[ClientKey{"", client.Region}] = *client
-				clientPool.Unlock()
-			}(region)
+			r := region
+			startClient(
+				&wg,
+				ctx,
+				recordErr,
+				func(client *Client) {
+					clientPool.set(ClientKey{"", client.Region}, *client)
+				},
+				config.WithRegion(r),
+			)
 		}
 	default:
 		client, err := NewClient(ctx)
@@ -106,17 +131,10 @@ func NewClientPool(ctx context.Context, profiles []string, regions []string) (ma
 		return map[ClientKey]Client{{"", client.Region}: *client}, nil
 	}
 
-	go func() {
-		wg.Wait()
-		close(wgDone)
-	}()
+	wg.Wait()
 
-	select {
-	case <-wgDone:
-		break
-	case err := <-errors:
-		close(errors)
-		return nil, err
+	if firstErr != nil {
+		return nil, firstErr
 	}
 
 	return clientPool.clients, nil

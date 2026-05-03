@@ -251,6 +251,7 @@ var Services = map[string]string{
 	"aws_ec2_local_gateway_route":                             "ec2",
 	"aws_ec2_local_gateway_route_table_vpc_association":       "ec2",
 	"aws_ec2_managed_prefix_list":                             "ec2",
+	"aws_ec2_tag":                                             "ec2",
 	"aws_ec2_traffic_mirror_filter":                           "ec2",
 	"aws_ec2_traffic_mirror_filter_rule":                      "ec2",
 	"aws_ec2_traffic_mirror_session":                          "ec2",

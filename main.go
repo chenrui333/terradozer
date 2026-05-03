@@ -214,6 +214,10 @@ func initProviders(providerNames []string, installDir string,
 
 		p, err := initAWSProvider(installDir, timeout)
 		if err != nil {
+			for _, started := range providers {
+				_ = started.Close()
+			}
+
 			return nil, err
 		}
 
@@ -236,8 +240,14 @@ func initAWSProvider(installDir string, timeout time.Duration) (*provider.Terraf
 
 	err = p.Configure(awsProviderConfig())
 	if err != nil {
-		return nil, fmt.Errorf("failed to configure provider (name=%s, version=%s): %w",
+		configureErr := fmt.Errorf("failed to configure provider (name=%s, version=%s): %w",
 			metaPlugin.Name, metaPlugin.Version, err)
+		closeErr := p.Close()
+		if closeErr != nil {
+			return nil, fmt.Errorf("%w; failed to close provider: %w", configureErr, closeErr)
+		}
+
+		return nil, configureErr
 	}
 
 	log.WithFields(log.Fields{

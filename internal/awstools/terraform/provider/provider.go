@@ -136,7 +136,7 @@ func (p TerraformProvider) GetSchemaForResource(terraformType string) (providers
 func (p TerraformProvider) ImportResource(terraformType string, id string) ([]providers.ImportedResource, error) {
 	var response providers.ImportResourceStateResponse
 
-	err := resource.Retry(30*time.Second, func() *resource.RetryError {
+	err := resource.Retry(p.timeout, func() *resource.RetryError {
 		response = p.ImportResourceState(providers.ImportResourceStateRequest{
 			TypeName: terraformType,
 			ID:       id,
@@ -169,7 +169,7 @@ func (p TerraformProvider) ImportResource(terraformType string, id string) ([]pr
 func (p TerraformProvider) ReadResource(terraformType string, state cty.Value) (cty.Value, error) {
 	var response providers.ReadResourceResponse
 
-	err := resource.Retry(30*time.Second, func() *resource.RetryError {
+	err := resource.Retry(p.timeout, func() *resource.RetryError {
 		response = p.provider.ReadResource(providers.ReadResourceRequest{
 			TypeName:   terraformType,
 			PriorState: state,
@@ -363,8 +363,14 @@ func Init(providerName string, installDir string, timeout time.Duration) (*Terra
 
 	err = p.Configure(pConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to configure provider (name=%s, version=%s): %s",
+		configureErr := fmt.Errorf("failed to configure provider (name=%s, version=%s): %w",
 			metaPlugin.Name, metaPlugin.Version, err)
+		closeErr := p.Close()
+		if closeErr != nil {
+			return nil, errors.Join(configureErr, fmt.Errorf("failed to close provider: %w", closeErr))
+		}
+
+		return nil, configureErr
 	}
 
 	log.WithFields(log.Fields{
@@ -384,7 +390,15 @@ func InitProviders(providerNames []string, installDir string,
 	for _, pName := range providerNames {
 		p, err := Init(pName, installDir, timeout)
 		if err != nil {
-			return nil, err
+			closeErrs := []error{err}
+			for name, started := range providers {
+				closeErr := started.Close()
+				if closeErr != nil {
+					closeErrs = append(closeErrs, fmt.Errorf("failed to close provider %s: %w", name, closeErr))
+				}
+			}
+
+			return nil, errors.Join(closeErrs...)
 		}
 
 		if p != nil {

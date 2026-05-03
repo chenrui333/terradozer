@@ -278,7 +278,7 @@ type Client struct {
 func NewClient(ctx context.Context, configs ...func(*config.LoadOptions) error) (*Client, error) {
 	cfg, err := config.LoadDefaultConfig(ctx, configs...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %s", err)
+		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
 	client := &Client{
