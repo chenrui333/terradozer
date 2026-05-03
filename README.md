@@ -27,9 +27,9 @@ Happy (terra)dozing!
   your approval
 * Using the `-force` flag (dangerous!), terradozer can run in an automated fashion without human interaction and approval,
   for example, as part of your CI pipeline
-* **Planned**, if you want me to implement this, [please upvote](https://github.com/chenrui333/terradozer/issues/9):
+* **Planned** ([#48](https://github.com/chenrui333/terradozer/issues/48)):
   Allow terradozer pointing directly to a state file stored in S3, i.e., `terradozer s3://path/to/terraform.tfstate`
-* **Planned**, if you want me to implement this, [please upvote](https://github.com/chenrui333/terradozer/issues/8):
+* **Planned** ([#49](https://github.com/chenrui333/terradozer/issues/49)):
   A `-recursive` flag to delete resources of all states found under a given directory, i.e.,
   `terradozer -recursive s3://bucket-with-states/`. This is especially helpful if
   you orchestrate Terraform modules with [Terragrunt](https://github.com/gruntwork-io/terragrunt) and store all states
