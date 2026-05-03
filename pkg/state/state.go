@@ -116,6 +116,10 @@ func parseS3StateSource(source string) (s3StateSource, bool, error) {
 		return s3StateSource{}, true, fmt.Errorf("S3 state path %q must include a bucket", source)
 	}
 
+	if parsed.RawQuery != "" || parsed.Fragment != "" {
+		return s3StateSource{}, true, fmt.Errorf("S3 state path %q must not include query or fragment components", source)
+	}
+
 	key := strings.TrimPrefix(parsed.Path, "/")
 	if key == "" {
 		return s3StateSource{}, true, fmt.Errorf("S3 state path %q must include a key", source)

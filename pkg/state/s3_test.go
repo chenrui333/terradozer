@@ -40,6 +40,18 @@ func TestParseS3StateSource(t *testing.T) {
 			expectedS3:  true,
 			expectedErr: "must include a key",
 		},
+		{
+			name:        "query component",
+			source:      "s3://state-bucket/path/to/terraform.tfstate?versionId=123",
+			expectedS3:  true,
+			expectedErr: "must not include query or fragment",
+		},
+		{
+			name:        "fragment component",
+			source:      "s3://state-bucket/path/to/terraform.tfstate#version",
+			expectedS3:  true,
+			expectedErr: "must not include query or fragment",
+		},
 	}
 
 	for _, tc := range tests {
