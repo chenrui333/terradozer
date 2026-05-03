@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/lambda" //nolint:staticcheck // Acceptance helpers still use AWS SDK v1.
 	"github.com/gruntwork-io/terratest/modules/aws"
 	"github.com/gruntwork-io/terratest/modules/terraform"
-	"github.com/jckuester/terradozer/internal/awstools/test"
+	"github.com/chenrui333/terradozer/internal/awstools/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

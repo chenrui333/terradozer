@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	awstoolsProvider "github.com/jckuester/terradozer/internal/awstools/terraform/provider"
+	awstoolsProvider "github.com/chenrui333/terradozer/internal/awstools/terraform/provider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zclconf/go-cty/cty"

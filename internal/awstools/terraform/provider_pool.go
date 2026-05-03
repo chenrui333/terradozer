@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	"github.com/jckuester/terradozer/internal/awstools/aws"
-	"github.com/jckuester/terradozer/internal/awstools/terraform/provider"
+	"github.com/chenrui333/terradozer/internal/awstools/aws"
+	"github.com/chenrui333/terradozer/internal/awstools/terraform/provider"
 	"github.com/zclconf/go-cty/cty"
 )
 

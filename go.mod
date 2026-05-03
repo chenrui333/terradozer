@@ -1,4 +1,4 @@
-module github.com/jckuester/terradozer
+module github.com/chenrui333/terradozer
 
 go 1.26.2
 

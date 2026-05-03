@@ -17,11 +17,11 @@ import (
 	"github.com/apex/log"
 	"github.com/apex/log/handlers/cli"
 	"github.com/fatih/color"
-	"github.com/jckuester/terradozer/internal"
-	"github.com/jckuester/terradozer/internal/awstools/terraform"
-	"github.com/jckuester/terradozer/internal/awstools/terraform/provider"
-	"github.com/jckuester/terradozer/pkg/resource"
-	"github.com/jckuester/terradozer/pkg/state"
+	"github.com/chenrui333/terradozer/internal"
+	"github.com/chenrui333/terradozer/internal/awstools/terraform"
+	"github.com/chenrui333/terradozer/internal/awstools/terraform/provider"
+	"github.com/chenrui333/terradozer/pkg/resource"
+	"github.com/chenrui333/terradozer/pkg/state"
 )
 
 func main() {

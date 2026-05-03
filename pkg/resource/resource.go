@@ -2,8 +2,8 @@
 package resource
 
 import (
-	"github.com/jckuester/terradozer/internal/awstools/terraform"
-	"github.com/jckuester/terradozer/internal/awstools/terraform/provider"
+	"github.com/chenrui333/terradozer/internal/awstools/terraform"
+	"github.com/chenrui333/terradozer/internal/awstools/terraform/provider"
 	"github.com/zclconf/go-cty/cty"
 )
 

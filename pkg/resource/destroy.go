@@ -6,7 +6,7 @@ import (
 	"sort"
 
 	"github.com/apex/log"
-	"github.com/jckuester/terradozer/internal"
+	"github.com/chenrui333/terradozer/internal"
 )
 
 const (
