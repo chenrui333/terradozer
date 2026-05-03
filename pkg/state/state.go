@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -39,13 +40,23 @@ type State struct {
 
 type s3ObjectReader func(ctx context.Context, bucket, key string) ([]byte, error)
 
+const defaultS3StateReadTimeout = 30 * time.Second
+
 // New creates a state from a given local path or S3 URI to a Terraform state file.
 func New(source string) (*State, error) {
-	return newWithS3ObjectReader(source, readS3ObjectFromAWS)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultS3StateReadTimeout)
+	defer cancel()
+
+	return NewWithContext(ctx, source)
 }
 
-func newWithS3ObjectReader(source string, reader s3ObjectReader) (*State, error) {
-	stateFile, err := getStateFromSource(source, reader)
+// NewWithContext creates a state using the provided context for remote state reads.
+func NewWithContext(ctx context.Context, source string) (*State, error) {
+	return newWithS3ObjectReader(ctx, source, readS3ObjectFromAWS)
+}
+
+func newWithS3ObjectReader(ctx context.Context, source string, reader s3ObjectReader) (*State, error) {
+	stateFile, err := getStateFromSource(ctx, source, reader)
 	if err != nil {
 		return nil, err
 	}
@@ -54,8 +65,8 @@ func newWithS3ObjectReader(source string, reader s3ObjectReader) (*State, error)
 }
 
 // copied from github.com/hashicorp/terraform/command/show.go
-func getStateFromSource(source string, reader s3ObjectReader) (*statefile.File, error) {
-	stateData, err := readStateData(source, reader)
+func getStateFromSource(ctx context.Context, source string, reader s3ObjectReader) (*statefile.File, error) {
+	stateData, err := readStateData(ctx, source, reader)
 	if err != nil {
 		return nil, err
 	}
@@ -89,14 +100,14 @@ type s3StateSource struct {
 	key    string
 }
 
-func readStateData(source string, reader s3ObjectReader) ([]byte, error) {
+func readStateData(ctx context.Context, source string, reader s3ObjectReader) ([]byte, error) {
 	s3Source, ok, err := parseS3StateSource(source)
 	if err != nil {
 		return nil, err
 	}
 
 	if ok {
-		return reader(context.Background(), s3Source.bucket, s3Source.key)
+		return reader(ctx, s3Source.bucket, s3Source.key)
 	}
 
 	return os.ReadFile(source)

@@ -81,7 +81,7 @@ func TestNewReadsS3StateSource(t *testing.T) {
 	stateData, err := os.ReadFile("../../test/test-fixtures/tfstates/version4.tfstate")
 	require.NoError(t, err)
 
-	actualState, err := newWithS3ObjectReader("s3://state-bucket/path/to/terraform.tfstate",
+	actualState, err := newWithS3ObjectReader(context.Background(), "s3://state-bucket/path/to/terraform.tfstate",
 		func(ctx context.Context, bucket, key string) ([]byte, error) {
 			assert.Equal(t, "state-bucket", bucket)
 			assert.Equal(t, "path/to/terraform.tfstate", key)
@@ -94,7 +94,7 @@ func TestNewReadsS3StateSource(t *testing.T) {
 }
 
 func TestNewReturnsS3ReadError(t *testing.T) {
-	actualState, err := newWithS3ObjectReader("s3://state-bucket/path/to/terraform.tfstate",
+	actualState, err := newWithS3ObjectReader(context.Background(), "s3://state-bucket/path/to/terraform.tfstate",
 		func(ctx context.Context, bucket, key string) ([]byte, error) {
 			return nil, errors.New("access denied")
 		})
@@ -102,4 +102,17 @@ func TestNewReturnsS3ReadError(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, actualState)
 	assert.Contains(t, err.Error(), "access denied")
+}
+
+func TestNewWithContextPassesContextToS3Reader(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	actualState, err := newWithS3ObjectReader(ctx, "s3://state-bucket/path/to/terraform.tfstate",
+		func(ctx context.Context, bucket, key string) ([]byte, error) {
+			return nil, ctx.Err()
+		})
+
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Nil(t, actualState)
 }
