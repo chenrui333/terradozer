@@ -4,6 +4,7 @@ package main
 //go:generate mockgen -source=pkg/resource/destroy.go -destination=pkg/resource/destroy_mock_test.go -package=resource_test
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -15,9 +16,9 @@ import (
 	"github.com/apex/log"
 	"github.com/apex/log/handlers/cli"
 	"github.com/fatih/color"
-	"github.com/jckuester/awstools-lib/terraform"
-	"github.com/jckuester/awstools-lib/terraform/provider"
 	"github.com/jckuester/terradozer/internal"
+	"github.com/jckuester/terradozer/internal/awstools/terraform"
+	"github.com/jckuester/terradozer/internal/awstools/terraform/provider"
 	"github.com/jckuester/terradozer/pkg/resource"
 	"github.com/jckuester/terradozer/pkg/state"
 	"github.com/zclconf/go-cty/cty"
@@ -228,7 +229,7 @@ func initAWSProvider(installDir string, timeout time.Duration) (*provider.Terraf
 		return nil, fmt.Errorf("failed to install provider (aws): %w", err)
 	}
 
-	p, err := provider.Launch(metaPlugin.Path, timeout)
+	p, err := provider.Launch(context.Background(), metaPlugin.Path, timeout)
 	if err != nil {
 		return nil, fmt.Errorf("failed to launch provider (%s): %w", metaPlugin.Path, err)
 	}
