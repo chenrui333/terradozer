@@ -109,7 +109,11 @@ func parseS3StateSource(source string) (s3StateSource, bool, error) {
 
 	parsed, err := url.Parse(source)
 	if err != nil {
-		return s3StateSource{}, true, fmt.Errorf("failed to parse S3 state path %q: %w", source, err)
+		return s3StateSource{}, true, fmt.Errorf("failed to parse S3 state path: %w", err)
+	}
+
+	if parsed.User != nil {
+		return s3StateSource{}, true, errors.New("S3 state path must not include embedded credentials")
 	}
 
 	if parsed.Host == "" {

@@ -41,6 +41,12 @@ func TestParseS3StateSource(t *testing.T) {
 			expectedErr: "must include a key",
 		},
 		{
+			name:        "embedded credentials",
+			source:      "s3://access:secret@state-bucket/path/to/terraform.tfstate",
+			expectedS3:  true,
+			expectedErr: "must not include embedded credentials",
+		},
+		{
 			name:        "query component",
 			source:      "s3://state-bucket/path/to/terraform.tfstate?versionId=123",
 			expectedS3:  true,
