@@ -4,12 +4,12 @@ go 1.26.0
 
 require (
 	github.com/apex/log v1.9.0
-	github.com/aws/aws-sdk-go v1.44.122
-	github.com/fatih/color v1.16.0
+	github.com/aws/aws-sdk-go v1.55.8
+	github.com/fatih/color v1.19.0
 	github.com/gruntwork-io/terratest v0.23.0
 	github.com/hashicorp/terraform v0.12.31
 	github.com/jckuester/awstools-lib v0.0.0-20220213052046-75c6b3af770f
-	github.com/onsi/gomega v1.9.0
+	github.com/onsi/gomega v1.40.0
 	github.com/stretchr/testify v1.11.1
 	github.com/zclconf/go-cty v1.7.1
 	go.uber.org/mock v0.6.0
@@ -200,7 +200,7 @@ require (
 	github.com/hashicorp/yamux v0.0.0-20180604194846-3520598351bb // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/klauspost/compress v1.15.11 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mitchellh/cli v1.0.0 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
@@ -230,11 +230,12 @@ require (
 	go.opentelemetry.io/otel/sdk v1.39.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.39.0 // indirect
 	go.opentelemetry.io/otel/trace v1.39.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
