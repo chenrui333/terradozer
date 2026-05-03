@@ -29,42 +29,16 @@ func DestroyResources(resources []DestroyableResource, parallel int) int {
 		parallel = 1
 	}
 
-	numOfResourcesToDelete := len(resources)
 	numOfDeletedResources := 0
 
 	var retryableResourceErrors []RetryDestroyError
 
-	resourcesToDelete := append([]DestroyableResource(nil), resources...)
-	sortDestroyableResources(resourcesToDelete)
+	resourceBuckets := groupDestroyableResourcesByPriority(resources)
 
-	jobQueue := make(chan DestroyableResource, numOfResourcesToDelete)
-
-	workerResults := make(chan workerResult, numOfResourcesToDelete)
-
-	for i := 1; i <= parallel; i++ {
-		go workerDestroy(jobQueue, workerResults)
-	}
-
-	log.Debug("start distributing resources to workers for this run")
-
-	for _, r := range resourcesToDelete {
-		jobQueue <- r
-	}
-
-	close(jobQueue)
-
-	for i := 1; i <= numOfResourcesToDelete; i++ {
-		result := <-workerResults
-
-		if result.resourceHasBeenDeleted {
-			numOfDeletedResources++
-
-			continue
-		}
-
-		if result.Err != nil {
-			retryableResourceErrors = append(retryableResourceErrors, *result.Err)
-		}
+	for _, bucket := range resourceBuckets {
+		deletedResources, retryableErrors := destroyResourceBucket(bucket.resources, parallel)
+		numOfDeletedResources += deletedResources
+		retryableResourceErrors = append(retryableResourceErrors, retryableErrors...)
 	}
 
 	if len(retryableResourceErrors) > 0 && numOfDeletedResources > 0 {
@@ -88,12 +62,70 @@ func DestroyResources(resources []DestroyableResource, parallel int) int {
 	return numOfDeletedResources
 }
 
-func sortDestroyableResources(resources []DestroyableResource) {
-	priorityByType := destroyPriorityByType()
+func destroyResourceBucket(resources []DestroyableResource, parallel int) (int, []RetryDestroyError) {
+	numOfResourcesToDelete := len(resources)
+	numOfDeletedResources := 0
+	retryableResourceErrors := []RetryDestroyError{}
 
-	sort.SliceStable(resources, func(i, j int) bool {
-		return priorityByType[resources[i].Type()] < priorityByType[resources[j].Type()]
+	jobQueue := make(chan DestroyableResource, numOfResourcesToDelete)
+
+	workerResults := make(chan workerResult, numOfResourcesToDelete)
+
+	for i := 1; i <= parallel; i++ {
+		go workerDestroy(jobQueue, workerResults)
+	}
+
+	log.Debug("start distributing resources to workers for this run")
+
+	for _, r := range resources {
+		jobQueue <- r
+	}
+
+	close(jobQueue)
+
+	for i := 1; i <= numOfResourcesToDelete; i++ {
+		result := <-workerResults
+
+		if result.resourceHasBeenDeleted {
+			numOfDeletedResources++
+
+			continue
+		}
+
+		if result.Err != nil {
+			retryableResourceErrors = append(retryableResourceErrors, *result.Err)
+		}
+	}
+
+	return numOfDeletedResources, retryableResourceErrors
+}
+
+type destroyPriorityBucket struct {
+	priority  int
+	resources []DestroyableResource
+}
+
+func groupDestroyableResourcesByPriority(resources []DestroyableResource) []destroyPriorityBucket {
+	priorityByType := destroyPriorityByType()
+	resourcesToDelete := append([]DestroyableResource(nil), resources...)
+
+	sort.SliceStable(resourcesToDelete, func(i, j int) bool {
+		return priorityByType[resourcesToDelete[i].Type()] < priorityByType[resourcesToDelete[j].Type()]
 	})
+
+	buckets := []destroyPriorityBucket{}
+	for _, r := range resourcesToDelete {
+		priority := priorityByType[r.Type()]
+		lastBucketIndex := len(buckets) - 1
+		if len(buckets) == 0 || buckets[lastBucketIndex].priority != priority {
+			buckets = append(buckets, destroyPriorityBucket{priority: priority})
+			lastBucketIndex = len(buckets) - 1
+		}
+
+		buckets[lastBucketIndex].resources = append(buckets[lastBucketIndex].resources, r)
+	}
+
+	return buckets
 }
 
 func destroyPriorityByType() map[string]int {

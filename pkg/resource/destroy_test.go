@@ -164,6 +164,53 @@ func TestDestroyResources_OrdersAWSResourcesByPriority(t *testing.T) {
 	}, actualOrder)
 }
 
+func TestDestroyResources_WaitsForPriorityBucketBeforeNextBucket(t *testing.T) {
+	lowPriorityStarted := make(chan struct{})
+	releaseLowPriority := make(chan struct{})
+	highPriorityStarted := make(chan struct{})
+	done := make(chan int, 1)
+
+	resources := []resource.DestroyableResource{
+		&blockingDestroyableResource{resourceType: "aws_vpc", started: highPriorityStarted},
+		&blockingDestroyableResource{
+			resourceType: "aws_eks_addon",
+			started:      lowPriorityStarted,
+			release:      releaseLowPriority,
+		},
+	}
+
+	go func() {
+		done <- resource.DestroyResources(resources, 2)
+	}()
+
+	select {
+	case <-lowPriorityStarted:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for low-priority-number resource to start")
+	}
+
+	select {
+	case <-highPriorityStarted:
+		t.Fatal("higher-priority-number resource started before earlier priority bucket finished")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(releaseLowPriority)
+
+	select {
+	case <-highPriorityStarted:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for higher-priority-number resource to start")
+	}
+
+	select {
+	case actualDeletionCount := <-done:
+		assert.Equal(t, len(resources), actualDeletionCount)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for destroy to finish")
+	}
+}
+
 type recordingDestroyableResource struct {
 	resourceType string
 	order        *[]string
@@ -180,6 +227,32 @@ func (r *recordingDestroyableResource) Type() string {
 }
 
 func (r *recordingDestroyableResource) ID() string {
+	return r.resourceType
+}
+
+type blockingDestroyableResource struct {
+	resourceType string
+	started      chan<- struct{}
+	release      <-chan struct{}
+}
+
+func (r *blockingDestroyableResource) Destroy() error {
+	if r.started != nil {
+		close(r.started)
+	}
+
+	if r.release != nil {
+		<-r.release
+	}
+
+	return nil
+}
+
+func (r *blockingDestroyableResource) Type() string {
+	return r.resourceType
+}
+
+func (r *blockingDestroyableResource) ID() string {
 	return r.resourceType
 }
 
