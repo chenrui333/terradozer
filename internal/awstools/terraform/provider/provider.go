@@ -71,11 +71,13 @@ func providerFactory(ctx context.Context, meta discovery.PluginMeta, loglevel hc
 		// so we can build the actual RPC-implemented provider.
 		rpcClient, err := client.Client()
 		if err != nil {
+			client.Kill()
 			return nil, err
 		}
 
 		raw, err := rpcClient.Dispense(plugin.ProviderPluginName)
 		if err != nil {
+			client.Kill()
 			return nil, err
 		}
 

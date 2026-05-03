@@ -2,6 +2,7 @@ package terraform
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -24,6 +25,55 @@ type providerPoolThreadSafe struct {
 	sync.Mutex
 
 	providers map[aws.ClientKey]provider.TerraformProvider
+}
+
+func (p *providerPoolThreadSafe) set(key aws.ClientKey, pr provider.TerraformProvider) {
+	p.Lock()
+	p.providers[key] = pr
+	p.Unlock()
+}
+
+func (p *providerPoolThreadSafe) closeAll(cause error) error {
+	closeErrs := []error{cause}
+
+	p.Lock()
+	defer p.Unlock()
+
+	for key, pr := range p.providers {
+		closeErr := pr.Close()
+		if closeErr != nil {
+			closeErrs = append(closeErrs, fmt.Errorf("failed to close provider for key %v: %w", key, closeErr))
+		}
+	}
+
+	return errors.Join(closeErrs...)
+}
+
+func providerConfigForClientKey(key aws.ClientKey) cty.Value {
+	config := provider.AWSProviderConfig().AsValueMap()
+	config[logFieldProfile] = cty.StringVal(key.Profile)
+	config[logFieldRegion] = cty.StringVal(key.Region)
+
+	return cty.ObjectVal(config)
+}
+
+func closeProviderAfterError(pr *provider.TerraformProvider, cause error) error {
+	closeErr := pr.Close()
+	if closeErr != nil {
+		return errors.Join(cause, fmt.Errorf("failed to close provider: %w", closeErr))
+	}
+
+	return cause
+}
+
+func configureProviderForPool(pr *provider.TerraformProvider, config cty.Value, name, version string) error {
+	err := pr.Configure(config)
+	if err == nil {
+		return nil
+	}
+
+	configureErr := fmt.Errorf("failed to configure provider (name=%s, version=%s): %w", name, version, err)
+	return closeProviderAfterError(pr, configureErr)
 }
 
 // NewProviderPool launches a set of Terraform AWS Providers with the configuration of the given clientKeys
@@ -62,91 +112,56 @@ func NewProviderPool(ctx context.Context, clientKeys []aws.ClientKey, version, i
 
 	clientKeys = removeDuplicateClientKeys(clientKeys)
 
-	if len(clientKeys) > 0 {
-		for _, clientKey := range clientKeys {
-			p := clientKey.Profile
-			r := clientKey.Region
-			wg.Go(func() {
-				err := startupCtx.Err()
-				if err != nil {
-					recordErr(err)
-					return
-				}
+	for _, clientKey := range clientKeys {
+		key := clientKey
+		wg.Go(func() {
+			err := startupCtx.Err()
+			if err != nil {
+				recordErr(err)
+				return
+			}
 
-				log.WithFields(log.Fields{
-					logFieldProfile: p,
-					logFieldRegion:  r,
-				}).Debugf("start launching new instance of Terraform AWS Provider")
+			log.WithFields(log.Fields{
+				logFieldProfile: key.Profile,
+				logFieldRegion:  key.Region,
+			}).Debugf("start launching new instance of Terraform AWS Provider")
 
-				pr, err := provider.Launch(ctx, metaPlugin.Path, timeout)
-				if err != nil {
-					recordErr(fmt.Errorf("failed to launch provider (%s): %w", metaPlugin.Path, err))
-					return
-				}
+			pr, err := provider.Launch(ctx, metaPlugin.Path, timeout)
+			if err != nil {
+				recordErr(fmt.Errorf("failed to launch provider (%s): %w", metaPlugin.Path, err))
+				return
+			}
 
-				config := cty.ObjectVal(map[string]cty.Value{
-					logFieldProfile:               cty.StringVal(p),
-					logFieldRegion:                cty.StringVal(r),
-					"access_key":                  cty.UnknownVal(cty.DynamicPseudoType),
-					"allowed_account_ids":         cty.UnknownVal(cty.DynamicPseudoType),
-					"assume_role":                 cty.UnknownVal(cty.DynamicPseudoType),
-					"default_tags":                cty.UnknownVal(cty.DynamicPseudoType),
-					"endpoints":                   cty.UnknownVal(cty.DynamicPseudoType),
-					"forbidden_account_ids":       cty.UnknownVal(cty.DynamicPseudoType),
-					"ignore_tag_prefixes":         cty.UnknownVal(cty.DynamicPseudoType),
-					"ignore_tags":                 cty.UnknownVal(cty.DynamicPseudoType),
-					"insecure":                    cty.UnknownVal(cty.DynamicPseudoType),
-					"max_retries":                 cty.UnknownVal(cty.DynamicPseudoType),
-					"s3_force_path_style":         cty.UnknownVal(cty.DynamicPseudoType),
-					"secret_key":                  cty.UnknownVal(cty.DynamicPseudoType),
-					"shared_credentials_file":     cty.UnknownVal(cty.DynamicPseudoType),
-					"skip_credentials_validation": cty.UnknownVal(cty.DynamicPseudoType),
-					"skip_get_ec2_platforms":      cty.UnknownVal(cty.DynamicPseudoType),
-					"skip_metadata_api_check":     cty.UnknownVal(cty.DynamicPseudoType),
-					"skip_region_validation":      cty.UnknownVal(cty.DynamicPseudoType),
-					"skip_requesting_account_id":  cty.UnknownVal(cty.DynamicPseudoType),
-					"token":                       cty.UnknownVal(cty.DynamicPseudoType),
-				})
+			err = configureProviderForPool(
+				pr,
+				providerConfigForClientKey(key),
+				metaPlugin.Name,
+				fmt.Sprint(metaPlugin.Version),
+			)
+			if err != nil {
+				recordErr(err)
+				return
+			}
 
-				err = pr.Configure(config)
-				if err != nil {
-					_ = pr.Close()
+			err = startupCtx.Err()
+			if err != nil {
+				recordErr(closeProviderAfterError(pr, err))
+				return
+			}
 
-					recordErr(fmt.Errorf("failed to configure provider (name=%s, version=%s): %w",
-						metaPlugin.Name, metaPlugin.Version, err))
+			providerPool.set(key, *pr)
 
-					return
-				}
-
-				err = startupCtx.Err()
-				if err != nil {
-					_ = pr.Close()
-					recordErr(err)
-					return
-				}
-
-				providerPool.Lock()
-				providerPool.providers[aws.ClientKey{Profile: p, Region: r}] = *pr
-				providerPool.Unlock()
-
-				log.WithFields(log.Fields{
-					logFieldProfile: p,
-					logFieldRegion:  r,
-				}).Debugf("launched new instance of Terraform AWS Provider")
-			})
-		}
+			log.WithFields(log.Fields{
+				logFieldProfile: key.Profile,
+				logFieldRegion:  key.Region,
+			}).Debugf("launched new instance of Terraform AWS Provider")
+		})
 	}
 
 	wg.Wait()
 
 	if firstErr != nil {
-		providerPool.Lock()
-		for _, p := range providerPool.providers {
-			_ = p.Close()
-		}
-		providerPool.Unlock()
-
-		return nil, firstErr
+		return nil, providerPool.closeAll(firstErr)
 	}
 
 	return providerPool.providers, nil
