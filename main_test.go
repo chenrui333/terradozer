@@ -77,6 +77,17 @@ func TestSetAWSProfileToDefault(t *testing.T) {
 	}
 }
 
+func TestMainExitCodeRejectsInvalidParallel(t *testing.T) {
+	originalArgs := os.Args
+	t.Cleanup(func() {
+		os.Args = originalArgs
+	})
+
+	os.Args = []string{"terradozer", "-parallel", "0", "terraform.tfstate"}
+
+	assert.Equal(t, 1, mainExitCode())
+}
+
 func TestInitProvidersSkipsUnsupportedProviders(t *testing.T) {
 	p, err := initProviders([]string{"google"}, ".terradozer", 10*time.Second)
 	assert.NoError(t, err)

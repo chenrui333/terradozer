@@ -23,6 +23,11 @@ type DestroyableResource interface {
 // the remaining, failed resources will be retried in a next run (until all resources are destroyed or
 // some destroys have permanently failed).
 func DestroyResources(resources []DestroyableResource, parallel int) int {
+	if parallel < 1 {
+		log.WithField("parallel", parallel).Warn(internal.Pad("invalid parallelism; using one worker"))
+		parallel = 1
+	}
+
 	numOfResourcesToDelete := len(resources)
 	numOfDeletedResources := 0
 
