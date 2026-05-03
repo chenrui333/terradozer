@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	"github.com/hashicorp/terraform/configs/configschema"
 	"github.com/chenrui333/terradozer/internal/awstools/aws"
 	"github.com/chenrui333/terradozer/internal/awstools/internal"
 	"github.com/chenrui333/terradozer/internal/awstools/terraform/provider"
+	"github.com/hashicorp/terraform/configs/configschema"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -194,8 +194,7 @@ func updateWorker(resources <-chan UpdatableResource, result chan<- updateWorker
 			continue
 		}
 
-		resourceNotFound := r.State().IsNull()
-		if resourceNotFound {
+		if state := r.State(); state != nil && state.IsNull() {
 			result <- updateWorkerResult{resource: r, err: errors.New("resource doesn't exist anymore")}
 
 			continue
@@ -252,7 +251,7 @@ func (r *Resource) importAndReadResource() (cty.Value, error) {
 			return currentResourceState, nil
 		}
 
-		log.WithError(err).WithFields(log.Fields{
+		log.WithFields(log.Fields{
 			"type": rImported.TypeName,
 		}).Debug("found multiple resources during import")
 	}
