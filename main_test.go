@@ -1,11 +1,13 @@
 package main
 
 import (
+	"io"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -78,14 +80,58 @@ func TestSetAWSProfileToDefault(t *testing.T) {
 }
 
 func TestMainExitCodeRejectsInvalidParallel(t *testing.T) {
-	originalArgs := os.Args
-	t.Cleanup(func() {
-		os.Args = originalArgs
-	})
+	testCases := []struct {
+		name     string
+		parallel string
+	}{
+		{
+			name:     "zero",
+			parallel: "0",
+		},
+		{
+			name:     "negative",
+			parallel: "-1",
+		},
+	}
 
-	os.Args = []string{"terradozer", "-parallel", "0", "terraform.tfstate"}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalArgs := os.Args
+			os.Args = []string{"terradozer", "-parallel", tc.parallel, "terraform.tfstate"}
+			t.Cleanup(func() {
+				os.Args = originalArgs
+			})
 
-	assert.Equal(t, 1, mainExitCode())
+			stderr := captureStderr(t, func() {
+				assert.Equal(t, 1, mainExitCode())
+			})
+
+			assert.Contains(t, stderr, "-parallel flag must be greater than 0")
+		})
+	}
+}
+
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+
+	originalStderr := os.Stderr
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	defer r.Close()
+
+	os.Stderr = w
+	defer func() {
+		os.Stderr = originalStderr
+	}()
+
+	fn()
+
+	require.NoError(t, w.Close())
+
+	output, err := io.ReadAll(r)
+	require.NoError(t, err)
+
+	return string(output)
 }
 
 func TestInitProvidersSkipsUnsupportedProviders(t *testing.T) {
