@@ -1,4 +1,4 @@
-name: CI
+name: ci
 
 on:
   push:
@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   test-and-vet:
-    name: Test + Vet (${{ matrix.os }})
+    name: test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -34,6 +34,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: go.sum
 
       - name: Install mockgen
         run: go install go.uber.org/mock/mockgen@v0.6.0
@@ -50,7 +51,7 @@ jobs:
         run: go vet ./...
 
   golangci-lint:
-    name: GolangCI-Lint
+    name: lint
     runs-on: ubuntu-latest
 
     steps:
@@ -62,6 +63,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: go.sum
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v8
