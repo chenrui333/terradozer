@@ -37,8 +37,9 @@ func NewProviderPool(ctx context.Context, clientKeys []aws.ClientKey, version, i
 		return nil, fmt.Errorf("failed to install provider (%s): %w", "aws", err)
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	// startupCtx coordinates pool creation without owning launched provider lifetimes.
+	startupCtx, cancelStartup := context.WithCancel(ctx)
+	defer cancelStartup()
 
 	var wg sync.WaitGroup
 	var errOnce sync.Once
@@ -51,7 +52,7 @@ func NewProviderPool(ctx context.Context, clientKeys []aws.ClientKey, version, i
 
 		errOnce.Do(func() {
 			firstErr = err
-			cancel()
+			cancelStartup()
 		})
 	}
 
@@ -66,7 +67,7 @@ func NewProviderPool(ctx context.Context, clientKeys []aws.ClientKey, version, i
 			p := clientKey.Profile
 			r := clientKey.Region
 			wg.Go(func() {
-				err := ctx.Err()
+				err := startupCtx.Err()
 				if err != nil {
 					recordErr(err)
 					return
@@ -117,7 +118,7 @@ func NewProviderPool(ctx context.Context, clientKeys []aws.ClientKey, version, i
 					return
 				}
 
-				err = ctx.Err()
+				err = startupCtx.Err()
 				if err != nil {
 					_ = pr.Close()
 					recordErr(err)
