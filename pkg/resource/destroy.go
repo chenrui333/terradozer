@@ -9,7 +9,10 @@ import (
 	"github.com/jckuester/terradozer/internal"
 )
 
-const fieldType = "type"
+const (
+	fieldType              = "type"
+	defaultDestroyPriority = 0
+)
 
 // DestroyableResource implementations can destroy a Terraform resource.
 type DestroyableResource interface {
@@ -110,12 +113,13 @@ func groupDestroyableResourcesByPriority(resources []DestroyableResource) []dest
 	resourcesToDelete := append([]DestroyableResource(nil), resources...)
 
 	sort.SliceStable(resourcesToDelete, func(i, j int) bool {
-		return priorityByType[resourcesToDelete[i].Type()] < priorityByType[resourcesToDelete[j].Type()]
+		return destroyPriority(resourcesToDelete[i].Type(), priorityByType) <
+			destroyPriority(resourcesToDelete[j].Type(), priorityByType)
 	})
 
 	buckets := []destroyPriorityBucket{}
 	for _, r := range resourcesToDelete {
-		priority := priorityByType[r.Type()]
+		priority := destroyPriority(r.Type(), priorityByType)
 		lastBucketIndex := len(buckets) - 1
 		if len(buckets) == 0 || buckets[lastBucketIndex].priority != priority {
 			buckets = append(buckets, destroyPriorityBucket{priority: priority})
@@ -126,6 +130,16 @@ func groupDestroyableResourcesByPriority(resources []DestroyableResource) []dest
 	}
 
 	return buckets
+}
+
+func destroyPriority(resourceType string, priorityByType map[string]int) int {
+	priority, ok := priorityByType[resourceType]
+	if !ok {
+		// Unknown resource types intentionally run first to avoid delaying known dependency chains.
+		return defaultDestroyPriority
+	}
+
+	return priority
 }
 
 func destroyPriorityByType() map[string]int {

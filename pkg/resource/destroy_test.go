@@ -3,6 +3,7 @@ package resource_test
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -232,14 +233,17 @@ func (r *recordingDestroyableResource) ID() string {
 
 type blockingDestroyableResource struct {
 	resourceType string
+	closeOnce    sync.Once
 	started      chan<- struct{}
 	release      <-chan struct{}
 }
 
 func (r *blockingDestroyableResource) Destroy() error {
-	if r.started != nil {
-		close(r.started)
-	}
+	r.closeOnce.Do(func() {
+		if r.started != nil {
+			close(r.started)
+		}
+	})
 
 	if r.release != nil {
 		<-r.release
