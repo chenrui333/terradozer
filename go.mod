@@ -6,13 +6,13 @@ require (
 	github.com/apex/log v1.9.0
 	github.com/aws/aws-sdk-go v1.44.122
 	github.com/fatih/color v1.16.0
-	github.com/golang/mock v1.6.0
 	github.com/gruntwork-io/terratest v0.23.0
 	github.com/hashicorp/terraform v0.12.31
 	github.com/jckuester/awstools-lib v0.0.0-20220213052046-75c6b3af770f
 	github.com/onsi/gomega v1.9.0
 	github.com/stretchr/testify v1.11.1
 	github.com/zclconf/go-cty v1.7.1
+	go.uber.org/mock v0.6.0
 )
 
 require (
