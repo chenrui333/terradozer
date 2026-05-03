@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -214,11 +215,15 @@ func initProviders(providerNames []string, installDir string,
 
 		p, err := initAWSProvider(installDir, timeout)
 		if err != nil {
-			for _, started := range providers {
-				_ = started.Close()
+			closeErrs := []error{err}
+			for name, started := range providers {
+				closeErr := started.Close()
+				if closeErr != nil {
+					closeErrs = append(closeErrs, fmt.Errorf("failed to close provider %s: %w", name, closeErr))
+				}
 			}
 
-			return nil, err
+			return nil, errors.Join(closeErrs...)
 		}
 
 		providers[providerName] = p
