@@ -118,6 +118,10 @@ func parseS3StateSource(source string) (s3StateSource, bool, error) {
 		return s3StateSource{}, false, nil
 	}
 
+	if s3SourceHasEmbeddedCredentials(source) {
+		return s3StateSource{}, true, errors.New("S3 state path must not include embedded credentials")
+	}
+
 	parsed, err := url.Parse(source)
 	if err != nil {
 		return s3StateSource{}, true, fmt.Errorf("failed to parse S3 state path: %w", err)
@@ -141,6 +145,16 @@ func parseS3StateSource(source string) (s3StateSource, bool, error) {
 	}
 
 	return s3StateSource{bucket: parsed.Host, key: key}, true, nil
+}
+
+func s3SourceHasEmbeddedCredentials(source string) bool {
+	remainder := source[len("s3://"):]
+	authorityEnd := strings.IndexAny(remainder, "/?#")
+	if authorityEnd == -1 {
+		authorityEnd = len(remainder)
+	}
+
+	return strings.Contains(remainder[:authorityEnd], "@")
 }
 
 func readS3ObjectFromAWS(ctx context.Context, bucket, key string) ([]byte, error) {

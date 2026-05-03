@@ -77,6 +77,16 @@ func TestParseS3StateSource(t *testing.T) {
 	}
 }
 
+func TestParseS3StateSourceRejectsMalformedCredentialedURIWithoutLeakingCredentials(t *testing.T) {
+	_, isS3, err := parseS3StateSource("s3://access:secret@state-bucket/path%zz")
+
+	assert.True(t, isS3)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must not include embedded credentials")
+	assert.NotContains(t, err.Error(), "access")
+	assert.NotContains(t, err.Error(), "secret")
+}
+
 func TestNewReadsS3StateSource(t *testing.T) {
 	stateData, err := os.ReadFile("../../test/test-fixtures/tfstates/version4.tfstate")
 	require.NoError(t, err)
