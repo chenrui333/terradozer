@@ -14,10 +14,10 @@ import (
 	"github.com/hashicorp/terraform/addrs"
 	"github.com/hashicorp/terraform/states"
 	"github.com/hashicorp/terraform/states/statefile"
-	"github.com/jckuester/awstools-lib/terraform"
-	"github.com/jckuester/awstools-lib/terraform/provider"
-	"github.com/jckuester/terradozer/internal"
-	"github.com/jckuester/terradozer/pkg/resource"
+	"github.com/chenrui333/terradozer/internal"
+	"github.com/chenrui333/terradozer/internal/awstools/terraform"
+	"github.com/chenrui333/terradozer/internal/awstools/terraform/provider"
+	"github.com/chenrui333/terradozer/pkg/resource"
 	"github.com/zclconf/go-cty/cty"
 )
 

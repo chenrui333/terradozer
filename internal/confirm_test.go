@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jckuester/terradozer/internal"
+	"github.com/chenrui333/terradozer/internal"
 	"github.com/stretchr/testify/assert"
 )
 

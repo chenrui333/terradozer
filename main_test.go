@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	awstoolsProvider "github.com/chenrui333/terradozer/internal/awstools/terraform/provider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zclconf/go-cty/cty"
@@ -150,7 +151,7 @@ func TestAWSProviderConfig(t *testing.T) {
 		t.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/tmp/credentials")
 		t.Setenv("AWS_SESSION_TOKEN", "token")
 
-		config := awsProviderConfig().AsValueMap()
+		config := awstoolsProvider.AWSProviderConfig().AsValueMap()
 
 		assert.True(t, config["access_key"].RawEquals(cty.StringVal("key-id")))
 		assert.True(t, config["profile"].RawEquals(cty.StringVal("ci")))
@@ -172,7 +173,7 @@ func TestAWSProviderConfig(t *testing.T) {
 		t.Setenv("AWS_SHARED_CREDENTIALS_FILE", "")
 		t.Setenv("AWS_SESSION_TOKEN", "")
 
-		config := awsProviderConfig().AsValueMap()
+		config := awstoolsProvider.AWSProviderConfig().AsValueMap()
 
 		assert.True(t, config["access_key"].RawEquals(cty.StringVal("")))
 		assert.True(t, config["profile"].RawEquals(cty.StringVal("")))
@@ -185,7 +186,7 @@ func TestAWSProviderConfig(t *testing.T) {
 }
 
 func TestAWSProviderV5BootstrapContract(t *testing.T) {
-	assert.Equal(t, "v5.100.0", awsProviderBootstrapVersion)
+	assert.Equal(t, "v5.100.0", awstoolsProvider.AWSProviderVersion)
 
 	requiredKeys := []string{
 		"access_key",
@@ -221,7 +222,7 @@ func TestAWSProviderV5BootstrapContract(t *testing.T) {
 		"use_fips_endpoint",
 	}
 
-	config := awsProviderConfig().AsValueMap()
+	config := awstoolsProvider.AWSProviderConfig().AsValueMap()
 	for _, key := range requiredKeys {
 		_, ok := config[key]
 		assert.Truef(t, ok, "expected key %q in aws provider bootstrap config", key)

@@ -4,6 +4,8 @@ package main
 //go:generate mockgen -source=pkg/resource/destroy.go -destination=pkg/resource/destroy_mock_test.go -package=resource_test
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -15,15 +17,12 @@ import (
 	"github.com/apex/log"
 	"github.com/apex/log/handlers/cli"
 	"github.com/fatih/color"
-	"github.com/jckuester/awstools-lib/terraform"
-	"github.com/jckuester/awstools-lib/terraform/provider"
-	"github.com/jckuester/terradozer/internal"
-	"github.com/jckuester/terradozer/pkg/resource"
-	"github.com/jckuester/terradozer/pkg/state"
-	"github.com/zclconf/go-cty/cty"
+	"github.com/chenrui333/terradozer/internal"
+	"github.com/chenrui333/terradozer/internal/awstools/terraform"
+	"github.com/chenrui333/terradozer/internal/awstools/terraform/provider"
+	"github.com/chenrui333/terradozer/pkg/resource"
+	"github.com/chenrui333/terradozer/pkg/state"
 )
-
-const awsProviderBootstrapVersion = "v5.100.0"
 
 func main() {
 	os.Exit(mainExitCode())
@@ -213,7 +212,15 @@ func initProviders(providerNames []string, installDir string,
 
 		p, err := initAWSProvider(installDir, timeout)
 		if err != nil {
-			return nil, err
+			closeErrs := []error{err}
+			for name, started := range providers {
+				closeErr := started.Close()
+				if closeErr != nil {
+					closeErrs = append(closeErrs, fmt.Errorf("failed to close provider %s: %w", name, closeErr))
+				}
+			}
+
+			return nil, errors.Join(closeErrs...)
 		}
 
 		providers[providerName] = p
@@ -223,20 +230,26 @@ func initProviders(providerNames []string, installDir string,
 }
 
 func initAWSProvider(installDir string, timeout time.Duration) (*provider.TerraformProvider, error) {
-	metaPlugin, err := provider.Install("aws", awsProviderBootstrapVersion, installDir)
+	metaPlugin, err := provider.Install("aws", provider.AWSProviderVersion, installDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to install provider (aws): %w", err)
 	}
 
-	p, err := provider.Launch(metaPlugin.Path, timeout)
+	p, err := provider.Launch(context.Background(), metaPlugin.Path, timeout)
 	if err != nil {
 		return nil, fmt.Errorf("failed to launch provider (%s): %w", metaPlugin.Path, err)
 	}
 
-	err = p.Configure(awsProviderConfig())
+	err = p.Configure(provider.AWSProviderConfig())
 	if err != nil {
-		return nil, fmt.Errorf("failed to configure provider (name=%s, version=%s): %w",
+		configureErr := fmt.Errorf("failed to configure provider (name=%s, version=%s): %w",
 			metaPlugin.Name, metaPlugin.Version, err)
+		closeErr := p.Close()
+		if closeErr != nil {
+			return nil, fmt.Errorf("%w; failed to close provider: %w", configureErr, closeErr)
+		}
+
+		return nil, configureErr
 	}
 
 	log.WithFields(log.Fields{
@@ -245,54 +258,6 @@ func initAWSProvider(installDir string, timeout time.Duration) (*provider.Terraf
 	}).Debug("configured provider")
 
 	return p, nil
-}
-
-func awsProviderConfig() cty.Value {
-	config := map[string]cty.Value{
-		"access_key":                         cty.StringVal(os.Getenv("AWS_ACCESS_KEY_ID")),
-		"allowed_account_ids":                cty.UnknownVal(cty.DynamicPseudoType),
-		"assume_role":                        cty.UnknownVal(cty.DynamicPseudoType),
-		"assume_role_with_web_identity":      cty.UnknownVal(cty.DynamicPseudoType),
-		"custom_ca_bundle":                   cty.UnknownVal(cty.DynamicPseudoType),
-		"default_tags":                       cty.UnknownVal(cty.DynamicPseudoType),
-		"ec2_metadata_service_endpoint":      cty.UnknownVal(cty.DynamicPseudoType),
-		"ec2_metadata_service_endpoint_mode": cty.UnknownVal(cty.DynamicPseudoType),
-		"endpoints":                          cty.UnknownVal(cty.DynamicPseudoType),
-		"forbidden_account_ids":              cty.UnknownVal(cty.DynamicPseudoType),
-		"http_proxy":                         cty.UnknownVal(cty.DynamicPseudoType),
-		"https_proxy":                        cty.UnknownVal(cty.DynamicPseudoType),
-		"ignore_tags":                        cty.UnknownVal(cty.DynamicPseudoType),
-		"insecure":                           cty.UnknownVal(cty.DynamicPseudoType),
-		"max_retries":                        cty.UnknownVal(cty.DynamicPseudoType),
-		"no_proxy":                           cty.UnknownVal(cty.DynamicPseudoType),
-		"profile":                            cty.StringVal(os.Getenv("AWS_PROFILE")),
-		"region":                             cty.StringVal(os.Getenv("AWS_REGION")),
-		"retry_mode":                         cty.UnknownVal(cty.DynamicPseudoType),
-		"s3_us_east_1_regional_endpoint":     cty.UnknownVal(cty.DynamicPseudoType),
-		"s3_use_path_style":                  cty.UnknownVal(cty.DynamicPseudoType),
-		"secret_key":                         cty.StringVal(os.Getenv("AWS_SECRET_ACCESS_KEY")),
-		"shared_config_files":                cty.UnknownVal(cty.DynamicPseudoType),
-		"shared_credentials_files":           cty.UnknownVal(cty.DynamicPseudoType),
-		"skip_credentials_validation":        cty.UnknownVal(cty.DynamicPseudoType),
-		"skip_metadata_api_check":            cty.UnknownVal(cty.DynamicPseudoType),
-		"skip_region_validation":             cty.UnknownVal(cty.DynamicPseudoType),
-		"skip_requesting_account_id":         cty.UnknownVal(cty.DynamicPseudoType),
-		"sts_region":                         cty.UnknownVal(cty.DynamicPseudoType),
-		"token":                              cty.StringVal(os.Getenv("AWS_SESSION_TOKEN")),
-		"token_bucket_rate_limiter_capacity": cty.UnknownVal(cty.DynamicPseudoType),
-		"use_dualstack_endpoint":             cty.UnknownVal(cty.DynamicPseudoType),
-		"use_fips_endpoint":                  cty.UnknownVal(cty.DynamicPseudoType),
-	}
-
-	if sharedCredentialsFile := os.Getenv("AWS_SHARED_CREDENTIALS_FILE"); sharedCredentialsFile != "" {
-		config["shared_credentials_files"] = cty.ListVal([]cty.Value{cty.StringVal(sharedCredentialsFile)})
-	}
-
-	if sharedConfigFile := os.Getenv("AWS_CONFIG_FILE"); sharedConfigFile != "" {
-		config["shared_config_files"] = cty.ListVal([]cty.Value{cty.StringVal(sharedConfigFile)})
-	}
-
-	return cty.ObjectVal(config)
 }
 
 func printHelp(fs *flag.FlagSet) {

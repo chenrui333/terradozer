@@ -13,14 +13,14 @@ import (
 	"github.com/gruntwork-io/terratest/modules/aws"
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/gruntwork-io/terratest/modules/terraform"
-	testUtil "github.com/jckuester/awstools-lib/test"
+	testUtil "github.com/chenrui333/terradozer/internal/awstools/test"
 	"github.com/onsi/gomega/gexec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	packagePath  = "github.com/jckuester/terradozer"
+	packagePath  = "github.com/chenrui333/terradozer"
 	usageMessage = `
 Terraform destroy using only the state - no *.tf files needed.
 

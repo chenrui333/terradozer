@@ -71,7 +71,6 @@
       "matchPackageNames": [
         "github.com/gruntwork-io/terratest",
         "github.com/hashicorp/terraform",
-        "github.com/jckuester/awstools-lib",
         "github.com/zclconf/go-cty"
       ],
       "groupName": "terraform compatibility dependencies",

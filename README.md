@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="terradozer" src="https://github.com/jckuester/terradozer/blob/master/img/logo.png" height="180" />
+  <img alt="terradozer" src="https://github.com/chenrui333/terradozer/blob/master/img/logo.png" height="180" />
   <h3 align="center">terradozer</h3>
   <p align="center">Terraform destroy using the state only - no *.tf files needed</p>
 </p>
@@ -8,8 +8,8 @@
 [![Release](https://img.shields.io/github/release/chenrui333/terradozer.svg?style=for-the-badge)](https://github.com/chenrui333/terradozer/releases/latest)
 [![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=for-the-badge)](/LICENSE.md)
 [![CI](https://img.shields.io/github/actions/workflow/status/chenrui333/terradozer/ci.yml?style=for-the-badge)](https://github.com/chenrui333/terradozer/actions/workflows/ci.yml)
-[![Codecov branch](https://img.shields.io/codecov/c/github/jckuester/terradozer/master.svg?style=for-the-badge)](https://codecov.io/gh/jckuester/terradozer)
-[![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge)](http://godoc.org/github.com/jckuester/terradozer)
+[![Codecov branch](https://img.shields.io/codecov/c/github/chenrui333/terradozer/master.svg?style=for-the-badge)](https://codecov.io/gh/chenrui333/terradozer)
+[![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge)](http://godoc.org/github.com/chenrui333/terradozer)
 
 Terradozer takes a Terraform state file as input and destroys all resources it finds in it - without needing any *.tf
 files. This works currently only for resources of the Terraform AWS Provider. If you need support for any other provider,
@@ -27,9 +27,9 @@ Happy (terra)dozing!
   your approval
 * Using the `-force` flag (dangerous!), terradozer can run in an automated fashion without human interaction and approval,
   for example, as part of your CI pipeline
-* **Planned**, if you want me to implement this, [please upvote](https://github.com/jckuester/terradozer/issues/9):
+* **Planned** ([#48](https://github.com/chenrui333/terradozer/issues/48)):
   Allow terradozer pointing directly to a state file stored in S3, i.e., `terradozer s3://path/to/terraform.tfstate`
-* **Planned**, if you want me to implement this, [please upvote](https://github.com/jckuester/terradozer/issues/8):
+* **Planned** ([#49](https://github.com/chenrui333/terradozer/issues/49)):
   A `-recursive` flag to delete resources of all states found under a given directory, i.e.,
   `terradozer -recursive s3://bucket-with-states/`. This is especially helpful if
   you orchestrate Terraform modules with [Terragrunt](https://github.com/gruntwork-io/terragrunt) and store all states

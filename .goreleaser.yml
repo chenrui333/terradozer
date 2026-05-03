@@ -14,7 +14,7 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X github.com/jckuester/terradozer/internal.version={{.Version}} -X github.com/jckuester/terradozer/internal.commit={{.ShortCommit}} -X github.com/jckuester/terradozer/internal.date={{.Date}}
+      - -s -w -X github.com/chenrui333/terradozer/internal.version={{.Version}} -X github.com/chenrui333/terradozer/internal.commit={{.ShortCommit}} -X github.com/chenrui333/terradozer/internal.date={{.Date}}
 
 archives:
   - id: terradozer
