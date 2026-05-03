@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	"github.com/golang/mock/gomock"
 	"github.com/gruntwork-io/terratest/modules/aws"
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/gruntwork-io/terratest/modules/terraform"
@@ -17,6 +16,7 @@ import (
 	"github.com/jckuester/terradozer/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestDestroyResources(t *testing.T) {

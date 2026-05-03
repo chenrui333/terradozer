@@ -8,6 +8,8 @@ import (
 	"github.com/jckuester/terradozer/internal"
 )
 
+const fieldType = "type"
+
 // DestroyableResource implementations can destroy a Terraform resource.
 type DestroyableResource interface {
 	Destroy() error
@@ -91,7 +93,7 @@ func workerDestroy(resources <-chan DestroyableResource, result chan<- workerRes
 			switch err := err.(type) {
 			case *RetryDestroyError:
 				log.WithFields(log.Fields{
-					"type":        r.Type(),
+					fieldType:     r.Type(),
 					"resource_id": r.ID(),
 				}).Info(internal.Pad("will retry to delete resource"))
 
@@ -101,7 +103,7 @@ func workerDestroy(resources <-chan DestroyableResource, result chan<- workerRes
 
 			default:
 				log.WithError(err).WithFields(log.Fields{
-					"type":        r.Type(),
+					fieldType:     r.Type(),
 					"resource_id": r.ID(),
 				}).Debug(internal.Pad("unable to delete resource"))
 
@@ -126,7 +128,7 @@ func (r Resource) Destroy() error {
 	err := r.Provider.DestroyResource(r.Type(), *r.State())
 	if err != nil {
 		log.WithError(err).WithFields(log.Fields{
-			"id": r.ID(), "type": r.Type()}).Debug(internal.Pad("failed to delete resource"))
+			"id": r.ID(), fieldType: r.Type()}).Debug(internal.Pad("failed to delete resource"))
 
 		return NewRetryDestroyError(err, &r)
 	}

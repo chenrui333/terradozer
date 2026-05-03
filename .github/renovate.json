@@ -1,7 +1,9 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    "config:best-practices",
+    "helpers:pinGitHubActionDigests"
   ],
   "enabledManagers": [
     "gomod",
@@ -12,6 +14,8 @@
     "after 9am and before 5pm every weekday"
   ],
   "dependencyDashboard": true,
+  "automerge": true,
+  "automergeType": "pr",
   "platformAutomerge": true,
   "labels": [
     "dependencies"
@@ -42,7 +46,7 @@
       "automergeType": "pr"
     },
     {
-      "description": "Group all non-major GitHub Actions updates and enable automerge.",
+      "description": "Group all non-major GitHub Actions updates, pin actions by digest, and enable automerge.",
       "matchManagers": [
         "github-actions"
       ],
@@ -55,8 +59,28 @@
       "labels": [
         "dependencies"
       ],
+      "pinDigests": true,
       "automerge": true,
       "automergeType": "pr"
+    },
+    {
+      "description": "Keep Terraform compatibility dependencies isolated because they share internal API constraints.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "github.com/gruntwork-io/terratest",
+        "github.com/hashicorp/terraform",
+        "github.com/jckuester/awstools-lib",
+        "github.com/zclconf/go-cty"
+      ],
+      "groupName": "terraform compatibility dependencies",
+      "labels": [
+        "dependencies",
+        "go"
+      ],
+      "automerge": false,
+      "dependencyDashboardApproval": true
     },
     {
       "description": "Keep major updates isolated and require manual review.",
