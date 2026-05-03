@@ -102,7 +102,6 @@ func mainExitCode() int {
 	pathToState := args[0]
 
 	setAWSRegionFromDefault()
-	setAWSProfileToDefault()
 
 	tfstate, err := state.New(pathToState)
 	if err != nil {
@@ -113,6 +112,8 @@ func mainExitCode() int {
 
 	internal.LogTitle("reading state")
 	log.WithField("source", pathToState).Info(internal.Pad("using state"))
+
+	setAWSProfileToDefault()
 
 	providers, err := initProviders(tfstate.ProviderNames(), "~/.terradozer", timeoutDuration)
 	if err != nil {
