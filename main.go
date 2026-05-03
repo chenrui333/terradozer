@@ -16,12 +16,12 @@ import (
 
 	"github.com/apex/log"
 	"github.com/apex/log/handlers/cli"
-	"github.com/fatih/color"
 	"github.com/chenrui333/terradozer/internal"
 	"github.com/chenrui333/terradozer/internal/awstools/terraform"
 	"github.com/chenrui333/terradozer/internal/awstools/terraform/provider"
 	"github.com/chenrui333/terradozer/pkg/resource"
 	"github.com/chenrui333/terradozer/pkg/state"
+	"github.com/fatih/color"
 )
 
 func main() {
@@ -101,6 +101,9 @@ func mainExitCode() int {
 
 	pathToState := args[0]
 
+	setAWSRegionFromDefault()
+	setAWSProfileToDefault()
+
 	tfstate, err := state.New(pathToState)
 	if err != nil {
 		fmt.Fprint(os.Stderr, color.RedString("Error:️ failed to read Terraform state file: %s\n", err))
@@ -109,10 +112,7 @@ func mainExitCode() int {
 	}
 
 	internal.LogTitle("reading state")
-	log.WithField("file", pathToState).Info(internal.Pad("using state"))
-
-	setAWSRegionFromDefault()
-	setAWSProfileToDefault()
+	log.WithField("source", pathToState).Info(internal.Pad("using state"))
 
 	providers, err := initProviders(tfstate.ProviderNames(), "~/.terradozer", timeoutDuration)
 	if err != nil {
@@ -270,7 +270,7 @@ const help = `
 Terraform destroy using only the state - no *.tf files needed.
 
 USAGE:
-  $ terradozer [flags] <path/to/terraform.tfstate>
+  $ terradozer [flags] <path/to/terraform.tfstate|s3://bucket/key>
 
 FLAGS:
 `

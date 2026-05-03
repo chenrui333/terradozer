@@ -3,21 +3,28 @@ package state
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/url"
 	"os"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/apex/log"
-	"github.com/hashicorp/terraform/addrs"
-	"github.com/hashicorp/terraform/states"
-	"github.com/hashicorp/terraform/states/statefile"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/chenrui333/terradozer/internal"
 	"github.com/chenrui333/terradozer/internal/awstools/terraform"
 	"github.com/chenrui333/terradozer/internal/awstools/terraform/provider"
 	"github.com/chenrui333/terradozer/pkg/resource"
+	"github.com/hashicorp/terraform/addrs"
+	"github.com/hashicorp/terraform/states"
+	"github.com/hashicorp/terraform/states/statefile"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -30,9 +37,15 @@ type State struct {
 	state *states.State
 }
 
-// New creates a state from a given path to a Terraform state file.
-func New(path string) (*State, error) {
-	stateFile, err := getStateFromPath(path)
+type s3ObjectReader func(ctx context.Context, bucket, key string) ([]byte, error)
+
+// New creates a state from a given local path or S3 URI to a Terraform state file.
+func New(source string) (*State, error) {
+	return newWithS3ObjectReader(source, readS3ObjectFromAWS)
+}
+
+func newWithS3ObjectReader(source string, reader s3ObjectReader) (*State, error) {
+	stateFile, err := getStateFromSource(source, reader)
 	if err != nil {
 		return nil, err
 	}
@@ -41,15 +54,15 @@ func New(path string) (*State, error) {
 }
 
 // copied from github.com/hashicorp/terraform/command/show.go
-func getStateFromPath(path string) (*statefile.File, error) {
-	stateData, err := os.ReadFile(path)
+func getStateFromSource(source string, reader s3ObjectReader) (*statefile.File, error) {
+	stateData, err := readStateData(source, reader)
 	if err != nil {
 		return nil, err
 	}
 
 	stateFile, err := readStateFile(stateData)
 	if err != nil {
-		return nil, fmt.Errorf("failed reading %s as a statefile: %s", path, err)
+		return nil, fmt.Errorf("failed reading %s as a statefile: %s", source, err)
 	}
 
 	if len(stateFile.State.ProviderAddrs()) > 0 || !stateJSONHasResources(stateData) {
@@ -63,12 +76,84 @@ func getStateFromPath(path string) (*statefile.File, error) {
 
 	normalizedStateFile, normalizeErr := readStateFile(normalizedStateData)
 	if normalizeErr == nil {
-		log.WithField("file", path).Debug(internal.Pad("normalized Terraform 1.x provider references"))
+		log.WithField("source", source).Debug(internal.Pad("normalized Terraform 1.x provider references"))
 
 		return normalizedStateFile, nil
 	}
 
 	return stateFile, nil
+}
+
+type s3StateSource struct {
+	bucket string
+	key    string
+}
+
+func readStateData(source string, reader s3ObjectReader) ([]byte, error) {
+	s3Source, ok, err := parseS3StateSource(source)
+	if err != nil {
+		return nil, err
+	}
+
+	if ok {
+		return reader(context.Background(), s3Source.bucket, s3Source.key)
+	}
+
+	return os.ReadFile(source)
+}
+
+func parseS3StateSource(source string) (s3StateSource, bool, error) {
+	if !strings.HasPrefix(strings.ToLower(source), "s3://") {
+		return s3StateSource{}, false, nil
+	}
+
+	parsed, err := url.Parse(source)
+	if err != nil {
+		return s3StateSource{}, true, fmt.Errorf("failed to parse S3 state path %q: %w", source, err)
+	}
+
+	if parsed.Host == "" {
+		return s3StateSource{}, true, fmt.Errorf("S3 state path %q must include a bucket", source)
+	}
+
+	key := strings.TrimPrefix(parsed.Path, "/")
+	if key == "" {
+		return s3StateSource{}, true, fmt.Errorf("S3 state path %q must include a key", source)
+	}
+
+	return s3StateSource{bucket: parsed.Host, key: key}, true, nil
+}
+
+func readS3ObjectFromAWS(ctx context.Context, bucket, key string) ([]byte, error) {
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load AWS config: %w", err)
+	}
+
+	client := s3.NewFromConfig(cfg)
+	object, err := client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get s3://%s/%s: %w", bucket, key, err)
+	}
+
+	if object.Body == nil {
+		return nil, fmt.Errorf("failed to get s3://%s/%s: response body is nil", bucket, key)
+	}
+
+	stateData, err := io.ReadAll(object.Body)
+	closeErr := object.Body.Close()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read s3://%s/%s: %w", bucket, key, err)
+	}
+
+	if closeErr != nil {
+		return nil, fmt.Errorf("failed to close s3://%s/%s response body: %w", bucket, key, closeErr)
+	}
+
+	return stateData, nil
 }
 
 func readStateFile(stateData []byte) (*statefile.File, error) {
