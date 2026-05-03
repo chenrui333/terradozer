@@ -140,6 +140,49 @@ func TestDestroyResources_DestroyError(t *testing.T) {
 	assert.Equal(t, actualDeletionCount, 0)
 }
 
+func TestDestroyResources_OrdersAWSResourcesByPriority(t *testing.T) {
+	var actualOrder []string
+	resources := []resource.DestroyableResource{
+		&recordingDestroyableResource{resourceType: "aws_vpc", order: &actualOrder},
+		&recordingDestroyableResource{resourceType: "aws_eks_cluster", order: &actualOrder},
+		&recordingDestroyableResource{resourceType: "aws_eks_addon", order: &actualOrder},
+		&recordingDestroyableResource{resourceType: "aws_subnet", order: &actualOrder},
+		&recordingDestroyableResource{resourceType: "aws_security_group_rule", order: &actualOrder},
+		&recordingDestroyableResource{resourceType: "custom_resource", order: &actualOrder},
+	}
+
+	actualDeletionCount := resource.DestroyResources(resources, 1)
+
+	assert.Equal(t, len(resources), actualDeletionCount)
+	assert.Equal(t, []string{
+		"custom_resource",
+		"aws_eks_addon",
+		"aws_eks_cluster",
+		"aws_security_group_rule",
+		"aws_subnet",
+		"aws_vpc",
+	}, actualOrder)
+}
+
+type recordingDestroyableResource struct {
+	resourceType string
+	order        *[]string
+}
+
+func (r *recordingDestroyableResource) Destroy() error {
+	*r.order = append(*r.order, r.resourceType)
+
+	return nil
+}
+
+func (r *recordingDestroyableResource) Type() string {
+	return r.resourceType
+}
+
+func (r *recordingDestroyableResource) ID() string {
+	return r.resourceType
+}
+
 func TestResource_Destroy(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test.")

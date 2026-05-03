@@ -3,6 +3,7 @@ package resource
 import (
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/apex/log"
 	"github.com/jckuester/terradozer/internal"
@@ -33,6 +34,9 @@ func DestroyResources(resources []DestroyableResource, parallel int) int {
 
 	var retryableResourceErrors []RetryDestroyError
 
+	resourcesToDelete := append([]DestroyableResource(nil), resources...)
+	sortDestroyableResources(resourcesToDelete)
+
 	jobQueue := make(chan DestroyableResource, numOfResourcesToDelete)
 
 	workerResults := make(chan workerResult, numOfResourcesToDelete)
@@ -43,7 +47,7 @@ func DestroyResources(resources []DestroyableResource, parallel int) int {
 
 	log.Debug("start distributing resources to workers for this run")
 
-	for _, r := range resources {
+	for _, r := range resourcesToDelete {
 		jobQueue <- r
 	}
 
@@ -82,6 +86,59 @@ func DestroyResources(resources []DestroyableResource, parallel int) int {
 	}
 
 	return numOfDeletedResources
+}
+
+func sortDestroyableResources(resources []DestroyableResource) {
+	priorityByType := destroyPriorityByType()
+
+	sort.SliceStable(resources, func(i, j int) bool {
+		return priorityByType[resources[i].Type()] < priorityByType[resources[j].Type()]
+	})
+}
+
+func destroyPriorityByType() map[string]int {
+	return map[string]int{
+		// EKS chain.
+		"aws_eks_addon":                     10,
+		"aws_eks_node_group":                20,
+		"aws_eks_access_entry":              25,
+		"aws_eks_access_policy_association": 25,
+		"aws_eks_cluster":                   30,
+
+		// Load balancer chain.
+		"aws_lb_listener":      10,
+		"aws_lb_listener_rule": 10,
+		"aws_lb_target_group":  15,
+		"aws_lb":               20,
+		"aws_alb_listener":     10,
+		"aws_alb_target_group": 15,
+		"aws_alb":              20,
+
+		// Network chain.
+		"aws_route_table_association": 10,
+		"aws_route":                   15,
+		"aws_route_table":             20,
+		"aws_nat_gateway":             25,
+		"aws_eip":                     30,
+		"aws_security_group_rule":     35,
+		"aws_network_interface":       38,
+		"aws_subnet":                  40,
+		"aws_security_group":          45,
+		"aws_internet_gateway":        48,
+		"aws_vpc":                     50,
+
+		// IAM chain.
+		"aws_iam_role_policy_attachment": 10,
+		"aws_iam_role_policy":            10,
+		"aws_iam_policy":                 20,
+		"aws_iam_instance_profile":       25,
+		"aws_iam_role":                   30,
+
+		// S3 chain.
+		"aws_s3_bucket_policy":     10,
+		"aws_s3_bucket_versioning": 10,
+		"aws_s3_bucket":            20,
+	}
 }
 
 type workerResult struct {
