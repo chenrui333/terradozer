@@ -132,6 +132,12 @@ func NewProviderPool(ctx context.Context, clientKeys []aws.ClientKey, version, i
 				return
 			}
 
+			err = startupCtx.Err()
+			if err != nil {
+				recordErr(closeProviderAfterError(pr, err))
+				return
+			}
+
 			err = configureProviderForPool(
 				pr,
 				providerConfigForClientKey(key),
