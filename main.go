@@ -103,9 +103,7 @@ func mainExitCode() int {
 
 	setAWSRegionFromDefault()
 
-	stateReadCtx, cancelStateRead := context.WithTimeout(context.Background(), timeoutDuration)
-	tfstate, err := state.NewWithContext(stateReadCtx, pathToState)
-	cancelStateRead()
+	tfstate, err := state.New(pathToState)
 	if err != nil {
 		fmt.Fprint(os.Stderr, color.RedString("Error:️ failed to read Terraform state file: %s\n", err))
 
