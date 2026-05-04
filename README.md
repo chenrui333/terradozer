@@ -54,10 +54,10 @@ Supported release targets:
 
 Release assets are published with GitHub Artifact Attestations, and matching attestation
 bundles (`sha256*.jsonl`) are attached to each release. To verify a downloaded asset and
-checksums file (example: `v0.1.2`):
+checksums file (example: `v0.3.0`):
 
 ```bash
-VERSION=v0.1.2
+VERSION=v0.3.0
 ASSET="terradozer_${VERSION}_linux_amd64.tar.gz"
 CHECKSUMS="terradozer_${VERSION}_checksums.txt"
 
@@ -78,11 +78,11 @@ fi
 gh attestation verify "$ASSET" --repo chenrui333/terradozer --bundle "$BUNDLE"
 ```
 
-Here is the recommended way to install a specific version (example: `v0.1.2`):
+Here is the recommended way to install a specific version (example: `v0.3.0`):
 
 ```bash
 # install it into ./bin/
-curl -sSfL https://raw.githubusercontent.com/chenrui333/terradozer/main/install.sh | sh -s v0.1.2
+curl -sSfL https://raw.githubusercontent.com/chenrui333/terradozer/main/install.sh | sh -s v0.3.0
 ```
 
 ## Usage
