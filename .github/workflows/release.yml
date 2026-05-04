@@ -34,13 +34,9 @@ jobs:
           cache: true
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          distribution: goreleaser
-          version: v2.15.4
-          args: release --clean --timeout 20m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: go run github.com/goreleaser/goreleaser/v2@v2.15.4 release --clean --timeout 20m
 
       - name: Attest release artifacts
         uses: actions/attest-build-provenance@v2
