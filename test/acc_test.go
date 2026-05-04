@@ -21,26 +21,30 @@ import (
 
 const (
 	packagePath  = "github.com/chenrui333/terradozer"
-	usageMessage = `
-Terraform destroy using only the state - no *.tf files needed.
-
-USAGE:
-  $ terradozer [flags] <path/to/terraform.tfstate|s3://bucket/key>
-
-FLAGS:
-  -debug
-    	Enable debug logging
-  -dry-run
-    	Show what would be destroyed
-  -force
-    	Destroy without asking for confirmation
-  -parallel int
-    	Limit the number of concurrent destroy operations (default 10)
-  -timeout string
-    	Amount of time to wait for a destroy of a resource to finish (default "30s")
-  -version
-    	Show application version
-`
+	usageMessage = "\n" +
+		"Terraform destroy using only the state - no *.tf files needed.\n" +
+		"\n" +
+		"USAGE:\n" +
+		"  $ terradozer [flags] <path/to/terraform.tfstate|s3://bucket/key>\n" +
+		"  $ terradozer -recursive [flags] <directory|s3://bucket/prefix/>\n" +
+		"\n" +
+		"FLAGS:\n" +
+		"  -debug\n" +
+		"    \tEnable debug logging\n" +
+		"  -dry-run\n" +
+		"    \tShow what would be destroyed\n" +
+		"  -force\n" +
+		"    \tDestroy without asking for confirmation\n" +
+		"  -parallel int\n" +
+		"    \tLimit the number of concurrent destroy operations (default 10)\n" +
+		"  -recursive\n" +
+		"    \tDiscover Terraform state files recursively under a local directory or S3 prefix\n" +
+		"  -state-timeout string\n" +
+		"    \tAmount of time to wait for state reads and recursive discovery (default \"30s\")\n" +
+		"  -timeout string\n" +
+		"    \tAmount of time to wait for a destroy of a resource to finish (default \"30s\")\n" +
+		"  -version\n" +
+		"    \tShow application version\n"
 )
 
 func TestAcc_ConfirmDeletion(t *testing.T) {

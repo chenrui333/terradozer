@@ -3,6 +3,7 @@ package main
 import (
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -112,6 +113,118 @@ func TestMainExitCodeRejectsInvalidParallel(t *testing.T) {
 	}
 }
 
+func TestMainExitCodeRejectsInvalidTimeout(t *testing.T) {
+	testCases := []struct {
+		name        string
+		timeout     string
+		expectedErr string
+	}{
+		{
+			name:        "malformed",
+			timeout:     "not-a-duration",
+			expectedErr: "failed to parse timeout flag",
+		},
+		{
+			name:        "zero",
+			timeout:     "0s",
+			expectedErr: "-timeout flag must be greater than 0",
+		},
+		{
+			name:        "negative",
+			timeout:     "-1s",
+			expectedErr: "-timeout flag must be greater than 0",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalArgs := os.Args
+			os.Args = []string{"terradozer", "-timeout", tc.timeout, "terraform.tfstate"}
+			t.Cleanup(func() {
+				os.Args = originalArgs
+			})
+
+			stderr := captureStderr(t, func() {
+				assert.Equal(t, 1, mainExitCode())
+			})
+
+			assert.Contains(t, stderr, tc.expectedErr)
+		})
+	}
+}
+
+func TestMainExitCodeRejectsInvalidStateTimeout(t *testing.T) {
+	testCases := []struct {
+		name         string
+		stateTimeout string
+		expectedErr  string
+	}{
+		{
+			name:         "malformed",
+			stateTimeout: "not-a-duration",
+			expectedErr:  "failed to parse state-timeout flag",
+		},
+		{
+			name:         "zero",
+			stateTimeout: "0s",
+			expectedErr:  "-state-timeout flag must be greater than 0",
+		},
+		{
+			name:         "negative",
+			stateTimeout: "-1s",
+			expectedErr:  "-state-timeout flag must be greater than 0",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalArgs := os.Args
+			os.Args = []string{"terradozer", "-state-timeout", tc.stateTimeout, "terraform.tfstate"}
+			t.Cleanup(func() {
+				os.Args = originalArgs
+			})
+
+			stderr := captureStderr(t, func() {
+				assert.Equal(t, 1, mainExitCode())
+			})
+
+			assert.Contains(t, stderr, tc.expectedErr)
+		})
+	}
+}
+
+func TestMainExitCodeRejectsExtraPositionalArguments(t *testing.T) {
+	testCases := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "single state",
+			args: []string{"terradozer", "one.tfstate", "two.tfstate"},
+		},
+		{
+			name: "recursive",
+			args: []string{"terradozer", "-recursive", "states", "other-states"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalArgs := os.Args
+			os.Args = tc.args
+			t.Cleanup(func() {
+				os.Args = originalArgs
+			})
+
+			stderr := captureStderr(t, func() {
+				assert.Equal(t, 1, mainExitCode())
+			})
+
+			assert.Contains(t, stderr, "exactly one path to Terraform state file or recursive source expected")
+		})
+	}
+}
+
 func TestMainExitCodeDoesNotDefaultProfileBeforeStateRead(t *testing.T) {
 	t.Setenv("AWS_ACCESS_KEY_ID", "access-key")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "secret-key")
@@ -129,6 +242,23 @@ func TestMainExitCodeDoesNotDefaultProfileBeforeStateRead(t *testing.T) {
 	})
 
 	assert.Contains(t, stderr, "must not include query or fragment components")
+	assert.Empty(t, os.Getenv("AWS_PROFILE"))
+}
+
+func TestMainExitCodeRejectsInvalidRecursiveSourceBeforeProfileDefault(t *testing.T) {
+	t.Setenv("AWS_PROFILE", "")
+
+	originalArgs := os.Args
+	os.Args = []string{"terradozer", "-recursive", filepath.Join(t.TempDir(), "missing")}
+	t.Cleanup(func() {
+		os.Args = originalArgs
+	})
+
+	stderr := captureStderr(t, func() {
+		assert.Equal(t, 1, mainExitCode())
+	})
+
+	assert.Contains(t, stderr, "failed to discover Terraform state files")
 	assert.Empty(t, os.Getenv("AWS_PROFILE"))
 }
 
