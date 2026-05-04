@@ -35,6 +35,7 @@ func mainExitCode() int {
 	var logDebug bool
 	var parallel int
 	var recursive bool
+	var stateTimeout string
 	var timeout string
 	var version bool
 
@@ -51,6 +52,8 @@ func mainExitCode() int {
 	flags.IntVar(&parallel, "parallel", 10, "Limit the number of concurrent destroy operations")
 	flags.BoolVar(&recursive, "recursive", false,
 		"Discover Terraform state files recursively under a local directory or S3 prefix")
+	flags.StringVar(&stateTimeout, "state-timeout", "30s",
+		"Amount of time to wait for state reads and recursive discovery")
 	flags.BoolVar(&version, "version", false, "Show application version")
 
 	_ = flags.Parse(os.Args[1:])
@@ -95,6 +98,14 @@ func mainExitCode() int {
 		return 1
 	}
 
+	stateTimeoutDuration, err := time.ParseDuration(stateTimeout)
+	if err != nil {
+		fmt.Fprint(os.Stderr, color.RedString("Error: failed to parse state-timeout flag: %s\n", err))
+		printHelp(flags)
+
+		return 1
+	}
+
 	if len(args) == 0 {
 		fmt.Fprint(os.Stderr, color.RedString("Error: path to Terraform state file expected\n"))
 		printHelp(flags)
@@ -106,14 +117,14 @@ func mainExitCode() int {
 
 	setAWSRegionFromDefault()
 
-	stateSources, err := resolveStateSources(pathToState, recursive)
+	stateSources, err := resolveStateSources(pathToState, recursive, stateTimeoutDuration)
 	if err != nil {
 		fmt.Fprint(os.Stderr, color.RedString("Error:️ failed to discover Terraform state files: %s\n", err))
 
 		return 1
 	}
 
-	loadedStates, err := loadStates(stateSources)
+	loadedStates, err := loadStates(stateSources, stateTimeoutDuration)
 	if err != nil {
 		fmt.Fprint(os.Stderr, color.RedString("Error:️ failed to read Terraform state file: %s\n", err))
 
@@ -188,18 +199,23 @@ type stateResourceGroup struct {
 	resources []terraform.UpdatableResource
 }
 
-func resolveStateSources(source string, recursive bool) ([]string, error) {
+func resolveStateSources(source string, recursive bool, stateTimeout time.Duration) ([]string, error) {
 	if !recursive {
 		return []string{source}, nil
 	}
 
-	return state.DiscoverSources(source)
+	ctx, cancel := context.WithTimeout(context.Background(), stateTimeout)
+	defer cancel()
+
+	return state.DiscoverSourcesWithContext(ctx, source)
 }
 
-func loadStates(sources []string) ([]loadedState, error) {
+func loadStates(sources []string, stateTimeout time.Duration) ([]loadedState, error) {
 	loadedStates := []loadedState{}
 	for _, source := range sources {
-		tfstate, err := state.New(source)
+		ctx, cancel := context.WithTimeout(context.Background(), stateTimeout)
+		tfstate, err := state.NewWithContext(ctx, source)
+		cancel()
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", source, err)
 		}
@@ -364,7 +380,8 @@ const help = `
 Terraform destroy using only the state - no *.tf files needed.
 
 USAGE:
-  $ terradozer [flags] <path/to/terraform.tfstate|s3://bucket/key|directory|s3://bucket/prefix/>
+  $ terradozer [flags] <path/to/terraform.tfstate|s3://bucket/key>
+  $ terradozer -recursive [flags] <directory|s3://bucket/prefix/>
 
 FLAGS:
 `

@@ -113,6 +113,20 @@ func TestMainExitCodeRejectsInvalidParallel(t *testing.T) {
 	}
 }
 
+func TestMainExitCodeRejectsInvalidStateTimeout(t *testing.T) {
+	originalArgs := os.Args
+	os.Args = []string{"terradozer", "-state-timeout", "not-a-duration", "terraform.tfstate"}
+	t.Cleanup(func() {
+		os.Args = originalArgs
+	})
+
+	stderr := captureStderr(t, func() {
+		assert.Equal(t, 1, mainExitCode())
+	})
+
+	assert.Contains(t, stderr, "failed to parse state-timeout flag")
+}
+
 func TestMainExitCodeDoesNotDefaultProfileBeforeStateRead(t *testing.T) {
 	t.Setenv("AWS_ACCESS_KEY_ID", "access-key")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "secret-key")
