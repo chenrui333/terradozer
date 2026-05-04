@@ -89,11 +89,15 @@ curl -sSfL https://raw.githubusercontent.com/chenrui333/terradozer/main/install.
 
 To delete all resources in a Terraform state file:
 
-    terradozer [flags] <path/to/terraform.tfstate|s3://bucket/key>
+```bash
+terradozer [flags] <path/to/terraform.tfstate|s3://bucket/key>
+```
 
 To delete all resources in every `.tfstate` file under a local directory or S3 prefix:
 
-    terradozer -recursive [flags] <directory|s3://bucket/prefix/>
+```bash
+terradozer -recursive [flags] <directory|s3://bucket/prefix/>
+```
 
 Remote state reads and recursive S3 discovery use `-state-timeout` (default `30s`). Increase it for large S3 prefixes
 or slow networks without changing the per-resource destroy `-timeout`.

@@ -106,6 +106,13 @@ func mainExitCode() int {
 		return 1
 	}
 
+	if stateTimeoutDuration <= 0 {
+		fmt.Fprint(os.Stderr, color.RedString("Error: -state-timeout flag must be greater than 0\n"))
+		printHelp(flags)
+
+		return 1
+	}
+
 	if len(args) == 0 {
 		fmt.Fprint(os.Stderr, color.RedString("Error: path to Terraform state file expected\n"))
 		printHelp(flags)

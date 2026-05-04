@@ -114,17 +114,43 @@ func TestMainExitCodeRejectsInvalidParallel(t *testing.T) {
 }
 
 func TestMainExitCodeRejectsInvalidStateTimeout(t *testing.T) {
-	originalArgs := os.Args
-	os.Args = []string{"terradozer", "-state-timeout", "not-a-duration", "terraform.tfstate"}
-	t.Cleanup(func() {
-		os.Args = originalArgs
-	})
+	testCases := []struct {
+		name         string
+		stateTimeout string
+		expectedErr  string
+	}{
+		{
+			name:         "malformed",
+			stateTimeout: "not-a-duration",
+			expectedErr:  "failed to parse state-timeout flag",
+		},
+		{
+			name:         "zero",
+			stateTimeout: "0s",
+			expectedErr:  "-state-timeout flag must be greater than 0",
+		},
+		{
+			name:         "negative",
+			stateTimeout: "-1s",
+			expectedErr:  "-state-timeout flag must be greater than 0",
+		},
+	}
 
-	stderr := captureStderr(t, func() {
-		assert.Equal(t, 1, mainExitCode())
-	})
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalArgs := os.Args
+			os.Args = []string{"terradozer", "-state-timeout", tc.stateTimeout, "terraform.tfstate"}
+			t.Cleanup(func() {
+				os.Args = originalArgs
+			})
 
-	assert.Contains(t, stderr, "failed to parse state-timeout flag")
+			stderr := captureStderr(t, func() {
+				assert.Equal(t, 1, mainExitCode())
+			})
+
+			assert.Contains(t, stderr, tc.expectedErr)
+		})
+	}
 }
 
 func TestMainExitCodeDoesNotDefaultProfileBeforeStateRead(t *testing.T) {
