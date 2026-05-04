@@ -25,7 +25,7 @@ const (
 Terraform destroy using only the state - no *.tf files needed.
 
 USAGE:
-  $ terradozer [flags] <path/to/terraform.tfstate|s3://bucket/key>
+  $ terradozer [flags] <path/to/terraform.tfstate|s3://bucket/key|directory|s3://bucket/prefix/>
 
 FLAGS:
   -debug
@@ -36,6 +36,8 @@ FLAGS:
     	Destroy without asking for confirmation
   -parallel int
     	Limit the number of concurrent destroy operations (default 10)
+  -recursive
+` + "    \tDiscover Terraform state files recursively under a local directory or S3 prefix\n" + `
   -timeout string
     	Amount of time to wait for a destroy of a resource to finish (default "30s")
   -version

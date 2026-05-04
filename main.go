@@ -34,6 +34,7 @@ func mainExitCode() int {
 	var force bool
 	var logDebug bool
 	var parallel int
+	var recursive bool
 	var timeout string
 	var version bool
 
@@ -48,6 +49,8 @@ func mainExitCode() int {
 	flags.BoolVar(&force, "force", false, "Destroy without asking for confirmation")
 	flags.BoolVar(&logDebug, "debug", false, "Enable debug logging")
 	flags.IntVar(&parallel, "parallel", 10, "Limit the number of concurrent destroy operations")
+	flags.BoolVar(&recursive, "recursive", false,
+		"Discover Terraform state files recursively under a local directory or S3 prefix")
 	flags.BoolVar(&version, "version", false, "Show application version")
 
 	_ = flags.Parse(os.Args[1:])
@@ -103,7 +106,14 @@ func mainExitCode() int {
 
 	setAWSRegionFromDefault()
 
-	tfstate, err := state.New(pathToState)
+	stateSources, err := resolveStateSources(pathToState, recursive)
+	if err != nil {
+		fmt.Fprint(os.Stderr, color.RedString("Error:️ failed to discover Terraform state files: %s\n", err))
+
+		return 1
+	}
+
+	loadedStates, err := loadStates(stateSources)
 	if err != nil {
 		fmt.Fprint(os.Stderr, color.RedString("Error:️ failed to read Terraform state file: %s\n", err))
 
@@ -111,11 +121,13 @@ func mainExitCode() int {
 	}
 
 	internal.LogTitle("reading state")
-	log.WithField("source", pathToState).Info(internal.Pad("using state"))
+	for _, loaded := range loadedStates {
+		log.WithField("source", loaded.source).Info(internal.Pad("using state"))
+	}
 
 	setAWSProfileToDefault()
 
-	providers, err := initProviders(tfstate.ProviderNames(), "~/.terradozer", timeoutDuration)
+	providers, err := initProviders(providerNamesFromLoadedStates(loadedStates), "~/.terradozer", timeoutDuration)
 	if err != nil {
 		fmt.Fprint(os.Stderr, color.RedString("\nError:️ failed to initialize Terraform providers: %s\n", err))
 
@@ -128,22 +140,18 @@ func mainExitCode() int {
 		}
 	}()
 
-	resources, err := tfstate.Resources(providers)
+	resourceGroups, resourcesWithUpdatedState, err := resourcesFromLoadedStates(loadedStates, providers, parallel)
 	if err != nil {
 		fmt.Fprint(os.Stderr, color.RedString("\nError:️ failed to get resources from Terraform state: %s\n", err))
 
 		return 1
 	}
 
-	resourcesWithUpdatedState := terraform.UpdateResources(resources, parallel)
-
 	if !force {
 		internal.LogTitle("showing resources that would be deleted (dry run)")
 
 		// always show the resources that would be affected before deleting anything
-		for _, r := range resourcesWithUpdatedState {
-			log.WithField("id", r.ID()).Warn(internal.Pad(r.Type()))
-		}
+		logResourcesToDelete(resourceGroups, recursive || len(stateSources) > 1)
 
 		if len(resourcesWithUpdatedState) == 0 {
 			internal.LogTitle("all resources have already been deleted")
@@ -168,6 +176,91 @@ func mainExitCode() int {
 	}
 
 	return 0
+}
+
+type loadedState struct {
+	source  string
+	tfstate *state.State
+}
+
+type stateResourceGroup struct {
+	source    string
+	resources []terraform.UpdatableResource
+}
+
+func resolveStateSources(source string, recursive bool) ([]string, error) {
+	if !recursive {
+		return []string{source}, nil
+	}
+
+	return state.DiscoverSources(source)
+}
+
+func loadStates(sources []string) ([]loadedState, error) {
+	loadedStates := []loadedState{}
+	for _, source := range sources {
+		tfstate, err := state.New(source)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", source, err)
+		}
+
+		loadedStates = append(loadedStates, loadedState{source: source, tfstate: tfstate})
+	}
+
+	return loadedStates, nil
+}
+
+func providerNamesFromLoadedStates(loadedStates []loadedState) []string {
+	providerNames := []string{}
+	seen := map[string]bool{}
+	for _, loaded := range loadedStates {
+		for _, providerName := range loaded.tfstate.ProviderNames() {
+			if seen[providerName] {
+				continue
+			}
+
+			seen[providerName] = true
+			providerNames = append(providerNames, providerName)
+		}
+	}
+
+	return providerNames
+}
+
+func resourcesFromLoadedStates(loadedStates []loadedState, providers map[string]*provider.TerraformProvider,
+	parallel int) ([]stateResourceGroup, []terraform.UpdatableResource, error) {
+	resourceGroups := []stateResourceGroup{}
+	allResources := []terraform.UpdatableResource{}
+	for _, loaded := range loadedStates {
+		resources, err := loaded.tfstate.Resources(providers)
+		if err != nil {
+			return nil, nil, fmt.Errorf("%s: %w", loaded.source, err)
+		}
+
+		updatedResources := terraform.UpdateResources(resources, parallel)
+		if len(updatedResources) == 0 {
+			continue
+		}
+
+		resourceGroups = append(resourceGroups, stateResourceGroup{
+			source:    loaded.source,
+			resources: updatedResources,
+		})
+		allResources = append(allResources, updatedResources...)
+	}
+
+	return resourceGroups, allResources, nil
+}
+
+func logResourcesToDelete(resourceGroups []stateResourceGroup, showSource bool) {
+	for _, group := range resourceGroups {
+		if showSource {
+			log.WithField("source", group.source).Info(internal.Pad("state"))
+		}
+		for _, r := range group.resources {
+			log.WithField("id", r.ID()).Warn(internal.Pad(r.Type()))
+		}
+	}
 }
 
 func convertToDestroyableResources(resources []terraform.UpdatableResource) []resource.DestroyableResource {
@@ -271,7 +364,7 @@ const help = `
 Terraform destroy using only the state - no *.tf files needed.
 
 USAGE:
-  $ terradozer [flags] <path/to/terraform.tfstate|s3://bucket/key>
+  $ terradozer [flags] <path/to/terraform.tfstate|s3://bucket/key|directory|s3://bucket/prefix/>
 
 FLAGS:
 `

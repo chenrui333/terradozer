@@ -3,6 +3,7 @@ package main
 import (
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -129,6 +130,23 @@ func TestMainExitCodeDoesNotDefaultProfileBeforeStateRead(t *testing.T) {
 	})
 
 	assert.Contains(t, stderr, "must not include query or fragment components")
+	assert.Empty(t, os.Getenv("AWS_PROFILE"))
+}
+
+func TestMainExitCodeRejectsInvalidRecursiveSourceBeforeProfileDefault(t *testing.T) {
+	t.Setenv("AWS_PROFILE", "")
+
+	originalArgs := os.Args
+	os.Args = []string{"terradozer", "-recursive", filepath.Join(t.TempDir(), "missing")}
+	t.Cleanup(func() {
+		os.Args = originalArgs
+	})
+
+	stderr := captureStderr(t, func() {
+		assert.Equal(t, 1, mainExitCode())
+	})
+
+	assert.Contains(t, stderr, "failed to discover Terraform state files")
 	assert.Empty(t, os.Getenv("AWS_PROFILE"))
 }
 

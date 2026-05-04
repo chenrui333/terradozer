@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -39,6 +40,7 @@ type State struct {
 }
 
 type s3ObjectReader func(ctx context.Context, bucket, key string) ([]byte, error)
+type s3ObjectLister func(ctx context.Context, bucket, prefix string) ([]string, error)
 
 const defaultS3StateReadTimeout = 30 * time.Second
 
@@ -53,6 +55,32 @@ func New(source string) (*State, error) {
 // NewWithContext creates a state using the provided context for remote state reads.
 func NewWithContext(ctx context.Context, source string) (*State, error) {
 	return newWithS3ObjectReader(ctx, source, readS3ObjectFromAWS)
+}
+
+// DiscoverSources discovers Terraform state files under a local directory or S3 prefix.
+func DiscoverSources(source string) ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultS3StateReadTimeout)
+	defer cancel()
+
+	return DiscoverSourcesWithContext(ctx, source)
+}
+
+// DiscoverSourcesWithContext discovers Terraform state files using the provided context for remote listing.
+func DiscoverSourcesWithContext(ctx context.Context, source string) ([]string, error) {
+	return discoverSourcesWithS3ObjectLister(ctx, source, listS3StateObjectsFromAWS)
+}
+
+func discoverSourcesWithS3ObjectLister(ctx context.Context, source string, lister s3ObjectLister) ([]string, error) {
+	s3Prefix, ok, err := parseS3StatePrefix(source)
+	if err != nil {
+		return nil, err
+	}
+
+	if ok {
+		return discoverS3StateSources(ctx, source, s3Prefix, lister)
+	}
+
+	return discoverLocalStateSources(source)
 }
 
 func newWithS3ObjectReader(ctx context.Context, source string, reader s3ObjectReader) (*State, error) {
@@ -100,6 +128,11 @@ type s3StateSource struct {
 	key    string
 }
 
+type s3StatePrefix struct {
+	bucket string
+	prefix string
+}
+
 func readStateData(ctx context.Context, source string, reader s3ObjectReader) ([]byte, error) {
 	s3Source, ok, err := parseS3StateSource(source)
 	if err != nil {
@@ -114,29 +147,12 @@ func readStateData(ctx context.Context, source string, reader s3ObjectReader) ([
 }
 
 func parseS3StateSource(source string) (s3StateSource, bool, error) {
-	if !strings.HasPrefix(strings.ToLower(source), "s3://") {
-		return s3StateSource{}, false, nil
-	}
-
-	if s3SourceHasEmbeddedCredentials(source) {
-		return s3StateSource{}, true, errors.New("S3 state path must not include embedded credentials")
-	}
-
-	parsed, err := url.Parse(source)
+	parsed, ok, err := parseS3StateURL(source)
 	if err != nil {
-		return s3StateSource{}, true, fmt.Errorf("failed to parse S3 state path: %w", err)
+		return s3StateSource{}, ok, err
 	}
-
-	if parsed.User != nil {
-		return s3StateSource{}, true, errors.New("S3 state path must not include embedded credentials")
-	}
-
-	if parsed.Host == "" {
-		return s3StateSource{}, true, fmt.Errorf("S3 state path %q must include a bucket", source)
-	}
-
-	if parsed.RawQuery != "" || parsed.Fragment != "" {
-		return s3StateSource{}, true, fmt.Errorf("S3 state path %q must not include query or fragment components", source)
+	if !ok {
+		return s3StateSource{}, false, nil
 	}
 
 	key := strings.TrimPrefix(parsed.Path, "/")
@@ -147,6 +163,52 @@ func parseS3StateSource(source string) (s3StateSource, bool, error) {
 	return s3StateSource{bucket: parsed.Host, key: key}, true, nil
 }
 
+func parseS3StatePrefix(source string) (s3StatePrefix, bool, error) {
+	parsed, ok, err := parseS3StateURL(source)
+	if err != nil {
+		return s3StatePrefix{}, ok, err
+	}
+	if !ok {
+		return s3StatePrefix{}, false, nil
+	}
+
+	prefix := strings.TrimPrefix(parsed.Path, "/")
+	if prefix != "" && !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
+
+	return s3StatePrefix{bucket: parsed.Host, prefix: prefix}, true, nil
+}
+
+func parseS3StateURL(source string) (*url.URL, bool, error) {
+	if !strings.HasPrefix(strings.ToLower(source), "s3://") {
+		return nil, false, nil
+	}
+
+	if s3SourceHasEmbeddedCredentials(source) {
+		return nil, true, errors.New("S3 state path must not include embedded credentials")
+	}
+
+	parsed, err := url.Parse(source)
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to parse S3 state path: %w", err)
+	}
+
+	if parsed.User != nil {
+		return nil, true, errors.New("S3 state path must not include embedded credentials")
+	}
+
+	if parsed.Host == "" {
+		return nil, true, fmt.Errorf("S3 state path %q must include a bucket", source)
+	}
+
+	if parsed.RawQuery != "" || parsed.Fragment != "" {
+		return nil, true, fmt.Errorf("S3 state path %q must not include query or fragment components", source)
+	}
+
+	return parsed, true, nil
+}
+
 func s3SourceHasEmbeddedCredentials(source string) bool {
 	remainder := source[len("s3://"):]
 	authorityEnd := strings.IndexAny(remainder, "/?#")
@@ -155,6 +217,74 @@ func s3SourceHasEmbeddedCredentials(source string) bool {
 	}
 
 	return strings.Contains(remainder[:authorityEnd], "@")
+}
+
+func discoverLocalStateSources(source string) ([]string, error) {
+	info, err := os.Stat(source)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("recursive state source %q must be a directory", source)
+	}
+
+	sources := []string{}
+	err = filepath.WalkDir(source, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !entry.Type().IsRegular() {
+			return nil
+		}
+		if strings.HasSuffix(entry.Name(), ".tfstate") {
+			sources = append(sources, path)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Strings(sources)
+	if len(sources) == 0 {
+		return nil, fmt.Errorf("no Terraform state files found under %q", source)
+	}
+
+	return sources, nil
+}
+
+func discoverS3StateSources(ctx context.Context, source string, s3Prefix s3StatePrefix,
+	lister s3ObjectLister) ([]string, error) {
+	keys, err := lister(ctx, s3Prefix.bucket, s3Prefix.prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	sources := []string{}
+	for _, key := range keys {
+		if !strings.HasPrefix(key, s3Prefix.prefix) {
+			continue
+		}
+		if strings.HasSuffix(key, ".tfstate") {
+			sources = append(sources, s3StateSourceURI(s3Prefix.bucket, key))
+		}
+	}
+
+	sort.Strings(sources)
+	if len(sources) == 0 {
+		return nil, fmt.Errorf("no Terraform state files found under %q", source)
+	}
+
+	return sources, nil
+}
+
+func s3StateSourceURI(bucket, key string) string {
+	return (&url.URL{
+		Scheme: "s3",
+		Host:   bucket,
+		Path:   "/" + key,
+	}).String()
 }
 
 func readS3ObjectFromAWS(ctx context.Context, bucket, key string) ([]byte, error) {
@@ -187,6 +317,35 @@ func readS3ObjectFromAWS(ctx context.Context, bucket, key string) ([]byte, error
 	}
 
 	return stateData, nil
+}
+
+func listS3StateObjectsFromAWS(ctx context.Context, bucket, prefix string) ([]string, error) {
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load AWS config: %w", err)
+	}
+
+	client := s3.NewFromConfig(cfg)
+	paginator := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{
+		Bucket: aws.String(bucket),
+		Prefix: aws.String(prefix),
+	})
+
+	keys := []string{}
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list s3://%s/%s: %w", bucket, prefix, err)
+		}
+
+		for _, object := range page.Contents {
+			if object.Key != nil {
+				keys = append(keys, *object.Key)
+			}
+		}
+	}
+
+	return keys, nil
 }
 
 func readStateFile(stateData []byte) (*statefile.File, error) {

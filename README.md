@@ -28,9 +28,9 @@ Happy (terra)dozing!
 * Using the `-force` flag (dangerous!), terradozer can run in an automated fashion without human interaction and approval,
   for example, as part of your CI pipeline
 * Read Terraform state from a local file or S3 path, i.e., `terradozer s3://bucket/path/to/terraform.tfstate`
-* **Planned** ([#49](https://github.com/chenrui333/terradozer/issues/49)):
-  A `-recursive` flag to delete resources of all states found under a given directory, i.e.,
-  `terradozer -recursive s3://bucket-with-states/`. This is especially helpful if
+* Use the `-recursive` flag to delete resources from all `.tfstate` files found under a local directory or S3 prefix,
+  i.e., `terradozer -recursive ./path/to/states` or `terradozer -recursive s3://bucket-with-states/`.
+  This is especially helpful if
   you orchestrate Terraform modules with [Terragrunt](https://github.com/gruntwork-io/terragrunt) and store all states
   under the same directory or in the same S3 bucket. This way, a complete Terragrunt project could be cleaned up in an
   automated fashion.
@@ -91,6 +91,10 @@ To delete all resources in a Terraform state file:
 
     terradozer [flags] <path/to/terraform.tfstate|s3://bucket/key>
 
+To delete all resources in every `.tfstate` file under a local directory or S3 prefix:
+
+    terradozer -recursive [flags] <directory|s3://bucket/prefix/>
+
 To see all options, run `terradozer --help`. Provide credentials for the AWS account you want to read state from and destroy resources in via the usual [environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html), e.g.,
 `AWS_PROFILE=<myaccount>` and either `AWS_REGION=<myregion>` or `AWS_DEFAULT_REGION=<myregion>`.
 If `AWS_PROFILE` is unset, terradozer uses the `default` profile.
@@ -104,6 +108,7 @@ Terradozer expects a valid Terraform state JSON document (the same content forma
 
 - The file extension is not used for detection; parsing is content-based.
 - Common names like `terraform.tfstate`, `*.json`, and `*.tfstate.json` are all supported.
+- Recursive discovery intentionally includes only files or S3 objects ending in `.tfstate`.
 - The file must contain Terraform-managed resources in state format (unsupported or malformed JSON will fail to parse).
  
 ## How it works
