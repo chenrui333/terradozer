@@ -19,6 +19,7 @@ jobs:
   goreleaser:
     name: GoReleaser
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Check out
@@ -36,8 +37,8 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: "~> v2"
-          args: release --clean
+          version: v2.15.4
+          args: release --clean --timeout 20m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
