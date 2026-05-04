@@ -37,8 +37,11 @@ Happy (terra)dozing!
 
 ## Installation
 
-It's recommended to install a specific version of terradozer available on the
-[releases page](https://github.com/chenrui333/terradozer/releases).
+```bash
+brew install chenrui333/tap/terradozer
+```
+
+### Verify Release Provenance
 
 GoReleaser publishes release assets with these names:
 
@@ -49,8 +52,6 @@ Supported release targets:
 
 - `os`: `darwin`, `linux`
 - `arch`: `amd64`, `arm64`
-
-### Verify Release Provenance
 
 Release assets are published with GitHub Artifact Attestations, and matching attestation
 bundles (`sha256*.jsonl`) are attached to each release. To verify a downloaded asset and
@@ -76,13 +77,6 @@ if [ ! -f "$BUNDLE" ]; then
   BUNDLE="sha256:${DIGEST}.jsonl"
 fi
 gh attestation verify "$ASSET" --repo chenrui333/terradozer --bundle "$BUNDLE"
-```
-
-Here is the recommended way to install a specific version (example: `v0.3.0`):
-
-```bash
-# install it into ./bin/
-curl -sSfL https://raw.githubusercontent.com/chenrui333/terradozer/main/install.sh | sh -s v0.3.0
 ```
 
 ## Usage
