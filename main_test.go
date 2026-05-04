@@ -112,6 +112,26 @@ func TestMainExitCodeRejectsInvalidParallel(t *testing.T) {
 	}
 }
 
+func TestMainExitCodeDoesNotDefaultProfileBeforeStateRead(t *testing.T) {
+	t.Setenv("AWS_ACCESS_KEY_ID", "access-key")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "secret-key")
+	t.Setenv("AWS_REGION", "us-east-1")
+	t.Setenv("AWS_PROFILE", "")
+
+	originalArgs := os.Args
+	os.Args = []string{"terradozer", "s3://state-bucket/path/to/terraform.tfstate?versionId=123"}
+	t.Cleanup(func() {
+		os.Args = originalArgs
+	})
+
+	stderr := captureStderr(t, func() {
+		assert.Equal(t, 1, mainExitCode())
+	})
+
+	assert.Contains(t, stderr, "must not include query or fragment components")
+	assert.Empty(t, os.Getenv("AWS_PROFILE"))
+}
+
 func captureStderr(t *testing.T, fn func()) string {
 	t.Helper()
 

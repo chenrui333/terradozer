@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
+	testUtil "github.com/chenrui333/terradozer/internal/awstools/test"
 	"github.com/gruntwork-io/terratest/modules/aws"
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/gruntwork-io/terratest/modules/terraform"
-	testUtil "github.com/chenrui333/terradozer/internal/awstools/test"
 	"github.com/onsi/gomega/gexec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +25,7 @@ const (
 Terraform destroy using only the state - no *.tf files needed.
 
 USAGE:
-  $ terradozer [flags] <path/to/terraform.tfstate>
+  $ terradozer [flags] <path/to/terraform.tfstate|s3://bucket/key>
 
 FLAGS:
   -debug

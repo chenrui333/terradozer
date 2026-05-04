@@ -27,8 +27,7 @@ Happy (terra)dozing!
   your approval
 * Using the `-force` flag (dangerous!), terradozer can run in an automated fashion without human interaction and approval,
   for example, as part of your CI pipeline
-* **Planned** ([#48](https://github.com/chenrui333/terradozer/issues/48)):
-  Allow terradozer pointing directly to a state file stored in S3, i.e., `terradozer s3://path/to/terraform.tfstate`
+* Read Terraform state from a local file or S3 path, i.e., `terradozer s3://bucket/path/to/terraform.tfstate`
 * **Planned** ([#49](https://github.com/chenrui333/terradozer/issues/49)):
   A `-recursive` flag to delete resources of all states found under a given directory, i.e.,
   `terradozer -recursive s3://bucket-with-states/`. This is especially helpful if
@@ -90,10 +89,9 @@ curl -sSfL https://raw.githubusercontent.com/chenrui333/terradozer/main/install.
 
 To delete all resources in a Terraform state file:
 
-    terradozer [flags] <path/to/terraform.tfstate>
+    terradozer [flags] <path/to/terraform.tfstate|s3://bucket/key>
 
-To see all options, run `terradozer --help`. Provide credentials for the AWS account you want to destroy resources in
-via the usual [environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html), e.g.,
+To see all options, run `terradozer --help`. Provide credentials for the AWS account you want to read state from and destroy resources in via the usual [environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html), e.g.,
 `AWS_PROFILE=<myaccount>` and either `AWS_REGION=<myregion>` or `AWS_DEFAULT_REGION=<myregion>`.
 If `AWS_PROFILE` is unset, terradozer uses the `default` profile.
 
