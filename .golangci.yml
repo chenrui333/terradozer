@@ -4,6 +4,9 @@ run:
 linters:
   default: all
   settings:
+    gomoddirectives:
+      replace-allow-list:
+        - github.com/spf13/afero
     lll:
       line-length: 120
   disable:
