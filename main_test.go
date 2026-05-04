@@ -113,6 +113,46 @@ func TestMainExitCodeRejectsInvalidParallel(t *testing.T) {
 	}
 }
 
+func TestMainExitCodeRejectsInvalidTimeout(t *testing.T) {
+	testCases := []struct {
+		name        string
+		timeout     string
+		expectedErr string
+	}{
+		{
+			name:        "malformed",
+			timeout:     "not-a-duration",
+			expectedErr: "failed to parse timeout flag",
+		},
+		{
+			name:        "zero",
+			timeout:     "0s",
+			expectedErr: "-timeout flag must be greater than 0",
+		},
+		{
+			name:        "negative",
+			timeout:     "-1s",
+			expectedErr: "-timeout flag must be greater than 0",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalArgs := os.Args
+			os.Args = []string{"terradozer", "-timeout", tc.timeout, "terraform.tfstate"}
+			t.Cleanup(func() {
+				os.Args = originalArgs
+			})
+
+			stderr := captureStderr(t, func() {
+				assert.Equal(t, 1, mainExitCode())
+			})
+
+			assert.Contains(t, stderr, tc.expectedErr)
+		})
+	}
+}
+
 func TestMainExitCodeRejectsInvalidStateTimeout(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -149,6 +189,38 @@ func TestMainExitCodeRejectsInvalidStateTimeout(t *testing.T) {
 			})
 
 			assert.Contains(t, stderr, tc.expectedErr)
+		})
+	}
+}
+
+func TestMainExitCodeRejectsExtraPositionalArguments(t *testing.T) {
+	testCases := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "single state",
+			args: []string{"terradozer", "one.tfstate", "two.tfstate"},
+		},
+		{
+			name: "recursive",
+			args: []string{"terradozer", "-recursive", "states", "other-states"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalArgs := os.Args
+			os.Args = tc.args
+			t.Cleanup(func() {
+				os.Args = originalArgs
+			})
+
+			stderr := captureStderr(t, func() {
+				assert.Equal(t, 1, mainExitCode())
+			})
+
+			assert.Contains(t, stderr, "exactly one path to Terraform state file or recursive source expected")
 		})
 	}
 }

@@ -98,6 +98,13 @@ func mainExitCode() int {
 		return 1
 	}
 
+	if timeoutDuration <= 0 {
+		fmt.Fprint(os.Stderr, color.RedString("Error: -timeout flag must be greater than 0\n"))
+		printHelp(flags)
+
+		return 1
+	}
+
 	stateTimeoutDuration, err := time.ParseDuration(stateTimeout)
 	if err != nil {
 		fmt.Fprint(os.Stderr, color.RedString("Error: failed to parse state-timeout flag: %s\n", err))
@@ -115,6 +122,14 @@ func mainExitCode() int {
 
 	if len(args) == 0 {
 		fmt.Fprint(os.Stderr, color.RedString("Error: path to Terraform state file expected\n"))
+		printHelp(flags)
+
+		return 1
+	}
+
+	if len(args) > 1 {
+		fmt.Fprint(os.Stderr,
+			color.RedString("Error: exactly one path to Terraform state file or recursive source expected\n"))
 		printHelp(flags)
 
 		return 1
