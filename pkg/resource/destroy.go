@@ -184,6 +184,15 @@ func destroyPriorityByType() map[string]int {
 		"aws_s3_bucket_policy":     10,
 		"aws_s3_bucket_versioning": 10,
 		"aws_s3_bucket":            20,
+
+		// API Gateway chain.
+		"aws_api_gateway_method_settings": 10,
+		"aws_api_gateway_integration":     15,
+		"aws_api_gateway_method":          15,
+		"aws_api_gateway_stage":           20,
+		"aws_api_gateway_deployment":      25,
+		"aws_api_gateway_resource":        30,
+		"aws_api_gateway_rest_api":        40,
 	}
 }
 
