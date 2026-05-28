@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.1 - 2026-05-28
+
+### Fixed
+
+- Add API Gateway destroy priority chain to prevent stage deletion failures caused by method_settings dependency ordering.
+
 ## v0.3.0 - 2026-05-04
 
 ### Added
